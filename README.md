@@ -44,6 +44,21 @@ corepack pnpm dev
 
 Frontend dev server runs at `http://127.0.0.1:5173` and proxies `/api` to the FastAPI backend.
 
+## One Command Dev Startup
+
+```bash
+./scripts/dev.sh
+```
+
+This script syncs Python dependencies, installs frontend dependencies, then starts both the FastAPI backend and the Vite frontend together.
+
+Optional environment overrides:
+
+```bash
+BACKEND_HOST=0.0.0.0 BACKEND_PORT=8000 FRONTEND_HOST=0.0.0.0 FRONTEND_PORT=5173 ./scripts/dev.sh
+SKIP_INSTALL=1 ./scripts/dev.sh
+```
+
 ## Verification
 
 ```bash
