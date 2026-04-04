@@ -211,3 +211,13 @@ __marimo__/
 
 # vscode
 .vscode/
+.gstack/
+
+# frontend
+node_modules/
+.vite/
+*.tsbuildinfo
+
+# keep frontend source helpers
+!web/src/lib/
+!web/src/lib/**

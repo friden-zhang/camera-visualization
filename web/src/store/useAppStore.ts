@@ -1,0 +1,243 @@
+import { create } from "zustand";
+
+import {
+  customDefinitionSchema,
+  type CameraIntrinsics,
+  type CustomObjectDefinition,
+  type CustomPointSpec,
+  type DisplayOptions,
+  type DistortionModel,
+  type ObjectSpec,
+  type Pose3D,
+  type ProjectionRequest,
+  type ProjectionResult,
+  type ProjectionSchema
+} from "../types";
+
+type ObjectType = ObjectSpec["type"];
+
+interface AppState {
+  schema: ProjectionSchema | null;
+  request: ProjectionRequest | null;
+  projection: ProjectionResult | null;
+  loading: boolean;
+  error: string | null;
+  geometryRevision: number;
+  hoveredPointId: string | null;
+  selectedPointId: string | null;
+  overlayUrl: string | null;
+  initializeFromSchema: (schema: ProjectionSchema) => void;
+  setProjection: (projection: ProjectionResult) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  setCameraIntrinsic: (key: keyof CameraIntrinsics, value: number) => void;
+  setDistortionValue: (key: keyof DistortionModel, value: number) => void;
+  setDistortionModel: (model: DistortionModel["model"]) => void;
+  setCameraPoseValue: (key: keyof Pose3D, value: number) => void;
+  setObjectPoseValue: (key: keyof Pose3D, value: number) => void;
+  setObjectDimension: (key: "width" | "length" | "height", value: number) => void;
+  setObjectType: (type: ObjectType) => void;
+  setCustomObjectDefinition: (definition: CustomObjectDefinition) => void;
+  setDisplayOption: (key: keyof DisplayOptions, value: boolean) => void;
+  setHoveredPointId: (pointId: string | null) => void;
+  setSelectedPointId: (pointId: string | null) => void;
+  setOverlayUrl: (url: string | null) => void;
+}
+
+const defaultPose = (): Pose3D => ({
+  x: 0,
+  y: 0,
+  z: 0,
+  yaw: 0,
+  pitch: 0,
+  roll: 0
+});
+
+function defaultObjectSpec(type: ObjectType): ObjectSpec {
+  if (type === "rectangle") {
+    return {
+      type,
+      width: 2,
+      length: 4,
+      pose: defaultPose()
+    };
+  }
+  if (type === "custom_points") {
+    return {
+      type,
+      pose: defaultPose(),
+      points: [
+        { id: "a", x: -1, y: -1, z: 0 },
+        { id: "b", x: 1, y: -1, z: 0 },
+        { id: "c", x: 1, y: 1, z: 0 },
+        { id: "d", x: -1, y: 1, z: 0 },
+        { id: "e", x: 0, y: 0, z: 2 }
+      ],
+      edges: [
+        { start_id: "a", end_id: "b" },
+        { start_id: "b", end_id: "c" },
+        { start_id: "c", end_id: "d" },
+        { start_id: "d", end_id: "a" },
+        { start_id: "a", end_id: "e" },
+        { start_id: "b", end_id: "e" },
+        { start_id: "c", end_id: "e" },
+        { start_id: "d", end_id: "e" }
+      ],
+      faces: []
+    };
+  }
+  return {
+    type: "box",
+    width: 1.8,
+    length: 4.4,
+    height: 1.5,
+    pose: defaultPose()
+  };
+}
+
+function updateRequest(
+  request: ProjectionRequest | null,
+  updater: (request: ProjectionRequest) => ProjectionRequest
+): ProjectionRequest | null {
+  return request ? updater(request) : request;
+}
+
+export const useAppStore = create<AppState>((set) => ({
+  schema: null,
+  request: null,
+  projection: null,
+  loading: false,
+  error: null,
+  geometryRevision: 0,
+  hoveredPointId: null,
+  selectedPointId: null,
+  overlayUrl: null,
+  initializeFromSchema: (schema) =>
+    set({
+      schema,
+      request: schema.defaults,
+      projection: null,
+      error: null,
+      geometryRevision: 1
+    }),
+  setProjection: (projection) => set({ projection, loading: false, error: null }),
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error, loading: false }),
+  setCameraIntrinsic: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        camera_intrinsics: {
+          ...request.camera_intrinsics,
+          [key]: value
+        }
+      })),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setDistortionValue: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        distortion: {
+          ...request.distortion,
+          [key]: value
+        }
+      })),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setDistortionModel: (model) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        distortion: {
+          ...request.distortion,
+          model
+        }
+      })),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setCameraPoseValue: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        camera_pose: {
+          ...request.camera_pose,
+          [key]: value
+        }
+      })),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setObjectPoseValue: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        object_spec: {
+          ...request.object_spec,
+          pose: {
+            ...request.object_spec.pose,
+            [key]: value
+          }
+        }
+      })),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setObjectDimension: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => {
+        if (request.object_spec.type === "custom_points") {
+          return request;
+        }
+        return {
+          ...request,
+          object_spec: {
+            ...request.object_spec,
+            [key]: value
+          }
+        };
+      }),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setObjectType: (type) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        object_spec: defaultObjectSpec(type)
+      })),
+      geometryRevision: state.geometryRevision + 1,
+      selectedPointId: null,
+      hoveredPointId: null
+    })),
+  setCustomObjectDefinition: (definition) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => {
+        if (request.object_spec.type !== "custom_points") {
+          return request;
+        }
+        const parsed = customDefinitionSchema.parse(definition);
+        const customSpec: CustomPointSpec = {
+          ...request.object_spec,
+          points: parsed.points,
+          edges: parsed.edges,
+          faces: parsed.faces
+        };
+        return {
+          ...request,
+          object_spec: customSpec
+        };
+      }),
+      geometryRevision: state.geometryRevision + 1
+    })),
+  setDisplayOption: (key, value) =>
+    set((state) => ({
+      request: updateRequest(state.request, (request) => ({
+        ...request,
+        display_options: {
+          ...request.display_options,
+          [key]: value
+        }
+      }))
+    })),
+  setHoveredPointId: (hoveredPointId) => set({ hoveredPointId }),
+  setSelectedPointId: (selectedPointId) => set({ selectedPointId }),
+  setOverlayUrl: (overlayUrl) => set({ overlayUrl })
+}));

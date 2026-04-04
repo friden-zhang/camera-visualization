@@ -1,0 +1,506 @@
+@import "@mantine/core/styles.css";
+
+:root {
+  color: #102224;
+  background:
+    radial-gradient(circle at top left, rgba(164, 209, 193, 0.65), transparent 28%),
+    linear-gradient(180deg, #eef4ef 0%, #dfe9e1 100%);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.panel {
+  padding: 20px;
+  border-right: 1px solid rgba(16, 34, 36, 0.12);
+  background: rgba(248, 251, 249, 0.92);
+  backdrop-filter: blur(18px);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.panel-group {
+  margin-bottom: 16px;
+  border: 1px solid rgba(16, 34, 36, 0.12);
+  border-radius: 14px;
+  background: white;
+  overflow: hidden;
+}
+
+.panel-group summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.panel-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel-group h2,
+.view-header h2,
+.debug-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.field-grid,
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.field,
+.checkbox-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.92rem;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 34, 36, 0.18);
+  border-radius: 10px;
+  background: #fcfdfb;
+}
+
+.field-textarea {
+  padding: 0 16px 16px;
+}
+
+.checkbox-field {
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+}
+
+.main-content {
+  padding: 16px 24px 24px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 14px;
+}
+
+.workspace-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
+.toolbar-title {
+  margin: 0;
+  font-size: clamp(1rem, 1.1vw, 1.18rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #356a67;
+  white-space: nowrap;
+}
+
+.status-block {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f4c06a;
+  color: #523500;
+  font-size: 0.82rem;
+}
+
+.status-pill-ready {
+  background: #b7e2d7;
+  color: #0d4a46;
+}
+
+.error-text {
+  color: #b53030;
+  font-size: 0.86rem;
+}
+
+.workspace-stack {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+}
+
+.workspace-primary,
+.workspace-secondary {
+  min-height: 0;
+}
+
+.workspace-primary:not(.workspace-primary-resizable) .view-card {
+  min-height: 440px;
+}
+
+.workspace-secondary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.workspace-secondary > * {
+  min-width: 0;
+}
+
+.workspace-primary-resizable > .view-card,
+.workspace-secondary-resizable > .view-card,
+.workspace-secondary-resizable > .debug-panel {
+  min-height: 0;
+  height: 100%;
+}
+
+.resize-handle {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(53, 106, 103, 0.14);
+  transition:
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(53, 106, 103, 0.34);
+  transition: background 120ms ease;
+}
+
+.resize-handle:hover::before,
+.resize-handle:hover::after {
+  background: rgba(53, 106, 103, 0.52);
+}
+
+.resize-handle-vertical {
+  width: 12px;
+  height: 100%;
+  align-self: stretch;
+  cursor: col-resize;
+}
+
+.resize-handle-vertical::before {
+  width: 2px;
+  height: 100%;
+  margin: auto;
+}
+
+.resize-handle-vertical::after {
+  width: 6px;
+  height: min(92px, 36%);
+  margin: auto;
+}
+
+.resize-handle-horizontal {
+  width: 100%;
+  height: 12px;
+  cursor: row-resize;
+}
+
+.resize-handle-horizontal::before {
+  width: 100%;
+  height: 2px;
+  margin: auto;
+}
+
+.resize-handle-horizontal::after {
+  width: min(80px, 100%);
+  height: 6px;
+  margin: auto;
+}
+
+.view-card,
+.debug-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(16, 34, 36, 0.08);
+  box-shadow: 0 24px 70px rgba(32, 60, 59, 0.08);
+  min-height: 0;
+}
+
+.debug-panel {
+  overflow: auto;
+}
+
+.canvas-shell {
+  width: 100%;
+  min-height: 280px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fbf8 0%, #dceae5 100%);
+}
+
+.scene-view-card .canvas-shell,
+.scene-view-card .canvas-shell canvas {
+  min-height: 420px;
+}
+
+.image-viewport-shell {
+  width: 100%;
+  min-height: 300px;
+  height: 100%;
+  padding: 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.image-view-card .image-viewport {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  display: block;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.workspace-primary-resizable .scene-view-card .canvas-shell,
+.workspace-primary-resizable .scene-view-card .canvas-shell canvas,
+.workspace-secondary-resizable .image-view-card .image-viewport-shell,
+.workspace-secondary-resizable .image-view-card .image-viewport {
+  min-height: 0;
+  height: 100%;
+}
+
+.scene-fallback,
+.loading-screen {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+}
+
+.image-sensor-bg {
+  fill: url(#imageSkyGradient);
+}
+
+.image-sky-glow {
+  pointer-events: none;
+}
+
+.image-frame {
+  fill: none;
+  stroke: rgba(43, 58, 68, 0.16);
+  stroke-width: 3;
+  pointer-events: none;
+}
+
+.image-vignette {
+  pointer-events: none;
+}
+
+.ground-plane {
+  stroke: rgba(89, 101, 112, 0.1);
+  stroke-width: 2;
+}
+
+.ground-plane-edge {
+  stroke: rgba(92, 106, 116, 0.22);
+  stroke-width: 2;
+}
+
+.camera-direction,
+.edge-line {
+  stroke: #376665;
+  stroke-width: 4;
+}
+
+.ground-edge-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-dasharray: 10 8;
+  pointer-events: none;
+}
+
+.ground-edge-line-undistorted {
+  stroke: rgba(98, 110, 120, 0.1);
+}
+
+.ground-edge-line-distorted {
+  stroke: rgba(98, 110, 120, 0.14);
+}
+
+.camera-origin {
+  fill: #d64545;
+}
+
+.point,
+.image-point,
+.center-point,
+.principal-point {
+  cursor: pointer;
+}
+
+.point {
+  fill: #1f8f88;
+}
+
+.point-active,
+.point-active-undistorted {
+  fill: #d64545;
+}
+
+.point-undistorted {
+  fill: rgba(31, 143, 136, 0.4);
+}
+
+.point-distorted {
+  fill: #d64545;
+}
+
+.center-point {
+  fill: #ffb347;
+}
+
+.principal-point {
+  fill: rgba(33, 45, 53, 0.82);
+}
+
+.bbox-rect {
+  fill: none;
+  stroke: #f0a53a;
+  stroke-width: 6;
+  stroke-dasharray: 16 8;
+}
+
+.point-label {
+  fill: #102224;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.debug-panel h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.debug-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.metric-list {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.metric-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(16, 34, 36, 0.12);
+}
+
+.metric-list dt {
+  font-weight: 600;
+}
+
+.metric-list dd {
+  margin: 0;
+  text-align: right;
+}
+
+.point-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.point-button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #dbe9e4;
+  color: #102224;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .main-content {
+    padding-top: 14px;
+  }
+
+  .workspace-secondary,
+  .debug-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-primary .view-card {
+    min-height: 420px;
+  }
+
+  .scene-view-card .canvas-shell,
+  .scene-view-card .canvas-shell canvas {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-toolbar {
+    align-items: flex-start;
+  }
+
+  .toolbar-title {
+    white-space: normal;
+  }
+}
