@@ -20,17 +20,32 @@ from camviz.core.engine import evaluate_projection
 from camviz.core.object_assets import build_object_type_definitions, build_parameterized_spec
 
 
+def round_default(value: float) -> float:
+    rounded = round(value, 2)
+    return 0.0 if rounded == 0.0 else rounded
+
+
 def build_default_request() -> ProjectionRequest:
     return ProjectionRequest(
         camera_intrinsics=CameraIntrinsics(
-            fx=960.0,
-            fy=960.0,
-            cx=640.0,
-            cy=360.0,
-            image_width=1280,
-            image_height=720,
+            fx=round_default(1567.356367755675),
+            fy=round_default(1567.306968974894),
+            cx=round_default(961.587845652537),
+            cy=round_default(542.296141020186),
+            image_width=1920,
+            image_height=1080,
         ),
-        distortion=DistortionModel(),
+        distortion=DistortionModel(
+            model="opencv",
+            k1=round_default(-0.310387649487),
+            k2=round_default(0.076313217331),
+            p1=round_default(-0.000111535757),
+            p2=round_default(-0.000564977398),
+            k3=round_default(0.070410443420),
+            k4=0.0,
+            k5=0.0,
+            k6=0.0,
+        ),
         camera_pose=Pose3D(x=0.0, y=-4.0, z=1.7, yaw=0.0, pitch=5.0, roll=0.0),
         object_spec=build_parameterized_spec("sedan", pose=Pose3D(x=0.0, y=14.0, z=0.0)),
         display_options=DisplayOptions(),
@@ -81,4 +96,3 @@ def build_app() -> FastAPI:
 
 
 app = build_app()
-

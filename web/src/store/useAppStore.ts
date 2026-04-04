@@ -34,6 +34,7 @@ interface AppState {
       overlayUrl?: string | null;
     }
   ) => void;
+  resetToDefaults: () => void;
   setProjection: (projection: ProjectionResult) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -105,6 +106,22 @@ export const useAppStore = create<AppState>((set) => ({
       hoveredPointId: null,
       selectedPointId: null,
       overlayUrl: restored?.overlayUrl ?? null
+    }),
+  resetToDefaults: () =>
+    set((state) => {
+      if (!state.schema) {
+        return state;
+      }
+
+      return {
+        request: cloneValue(state.schema.defaults),
+        projection: null,
+        error: null,
+        geometryRevision: state.geometryRevision + 1,
+        hoveredPointId: null,
+        selectedPointId: null,
+        overlayUrl: null
+      };
     }),
   setProjection: (projection) => set({ projection, loading: false, error: null }),
   setLoading: (loading) => set({ loading }),

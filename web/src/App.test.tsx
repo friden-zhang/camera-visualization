@@ -172,20 +172,20 @@ const schemaPayload = {
   distortion_models: ["opencv", "fisheye"],
   defaults: {
     camera_intrinsics: {
-      fx: 960,
-      fy: 960,
-      cx: 640,
-      cy: 360,
-      image_width: 1280,
-      image_height: 720
+      fx: 1567.36,
+      fy: 1567.31,
+      cx: 961.59,
+      cy: 542.3,
+      image_width: 1920,
+      image_height: 1080
     },
     distortion: {
       model: "opencv",
-      k1: 0,
-      k2: 0,
+      k1: -0.31,
+      k2: 0.08,
       p1: 0,
       p2: 0,
-      k3: 0,
+      k3: 0.07,
       k4: 0,
       k5: 0,
       k6: 0
@@ -496,6 +496,59 @@ describe("App", () => {
     expect(evaluateBody.camera_intrinsics.fx).toBe(1024);
     expect(evaluateBody.object_spec.type).toBe("bicycle");
     expect(evaluateBody.object_spec.pose.x).toBe(1.2);
+  });
+
+  it("resets request, layout, and overlay back to defaults", async () => {
+    const user = userEvent.setup();
+    const persistedRequest = {
+      ...schemaPayload.defaults,
+      camera_intrinsics: {
+        ...schemaPayload.defaults.camera_intrinsics,
+        fx: 1024
+      },
+      object_spec: {
+        ...schemaPayload.object_types.find((item) => item.type === "bicycle")!.defaults,
+        pose: {
+          ...objectPose,
+          x: 1.2
+        }
+      }
+    };
+
+    persistenceMock.loadPersistedLayout.mockReturnValue({
+      panelWidth: 420,
+      sceneHeight: 380,
+      imageWidth: 720
+    });
+    persistenceMock.loadPersistedInputState.mockResolvedValue({
+      request: persistedRequest,
+      overlayUrl: "data:image/png;base64,AAAA"
+    });
+
+    render(<App />);
+
+    await screen.findByDisplayValue("1024");
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    await user.click(screen.getByRole("button", { name: /reset to defaults/i }));
+
+    await screen.findByDisplayValue("1567.36");
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+
+    const shell = document.querySelector(".app-shell");
+    expect(shell).not.toBeNull();
+    expect((shell as HTMLElement).style.gridTemplateColumns).toBe("360px 12px minmax(0, 1fr)");
+
+    const overlayImage = document.querySelector("image[href='data:image/png;base64,AAAA']");
+    expect(overlayImage).toBeNull();
+
+    const evaluateCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[2];
+    expect(evaluateCall).toBeDefined();
+    const evaluateBody = JSON.parse(String(evaluateCall[1]?.body));
+    expect(evaluateBody.camera_intrinsics.fx).toBe(1567.36);
+    expect(evaluateBody.camera_intrinsics.image_width).toBe(1920);
+    expect(evaluateBody.object_spec.type).toBe("sedan");
+    expect(persistenceMock.savePersistedOverlayUrl).toHaveBeenLastCalledWith(null);
   });
 
   it("renders schema-driven object controls and switches parameter sets by object type", async () => {

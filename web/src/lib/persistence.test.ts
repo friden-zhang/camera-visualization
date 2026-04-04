@@ -89,20 +89,20 @@ const schema: ProjectionSchema = {
   distortion_models: ["opencv", "fisheye"],
   defaults: {
     camera_intrinsics: {
-      fx: 960,
-      fy: 960,
-      cx: 640,
-      cy: 360,
-      image_width: 1280,
-      image_height: 720
+      fx: 1567.36,
+      fy: 1567.31,
+      cx: 961.59,
+      cy: 542.3,
+      image_width: 1920,
+      image_height: 1080
     },
     distortion: {
       model: "opencv",
-      k1: 0,
-      k2: 0,
+      k1: -0.31,
+      k2: 0.08,
       p1: 0,
       p2: 0,
-      k3: 0,
+      k3: 0.07,
       k4: 0,
       k5: 0,
       k6: 0

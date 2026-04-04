@@ -62,6 +62,25 @@ def test_schema_endpoint_exposes_supported_object_definitions_and_defaults() -> 
         "custom_points",
     ]
     assert payload["defaults"]["object_spec"]["type"] == "sedan"
+    assert payload["defaults"]["camera_intrinsics"] == {
+        "fx": 1567.36,
+        "fy": 1567.31,
+        "cx": 961.59,
+        "cy": 542.3,
+        "image_width": 1920,
+        "image_height": 1080,
+    }
+    assert payload["defaults"]["distortion"] == {
+        "model": "opencv",
+        "k1": -0.31,
+        "k2": 0.08,
+        "p1": 0.0,
+        "p2": 0.0,
+        "k3": 0.07,
+        "k4": 0.0,
+        "k5": 0.0,
+        "k6": 0.0,
+    }
     sedan = next(item for item in payload["object_types"] if item["type"] == "sedan")
     assert any(parameter["name"] == "wheelbase" for parameter in sedan["parameters"])
     assert payload["distortion_models"] == ["opencv", "fisheye"]

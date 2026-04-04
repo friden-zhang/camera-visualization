@@ -189,10 +189,12 @@ export default function App(): JSX.Element {
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [layout, setLayout] = useState<LayoutState>(() => loadPersistedLayout() ?? DEFAULT_LAYOUT);
   const request = useAppStore((state) => state.request);
+  const schema = useAppStore((state) => state.schema);
   const projection = useDeferredValue(useAppStore((state) => state.projection));
   const loading = useAppStore((state) => state.loading);
   const error = useAppStore((state) => state.error);
   const overlayUrl = useAppStore((state) => state.overlayUrl);
+  const resetToDefaults = useAppStore((state) => state.resetToDefaults);
   const isDesktopLayout = viewportWidth > DESKTOP_BREAKPOINT;
 
   const stopDragging = useEffectEvent(() => {
@@ -338,6 +340,14 @@ export default function App(): JSX.Element {
     void savePersistedOverlayUrl(overlayUrl);
   }, [overlayUrl]);
 
+  const handleResetToDefaults = useEffectEvent(() => {
+    if (!schema) {
+      return;
+    }
+    setLayout(DEFAULT_LAYOUT);
+    resetToDefaults();
+  });
+
   const startDragging = (dragTarget: DragTarget, cursor: "col-resize" | "row-resize") =>
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (!isDesktopLayout || event.button !== 0) {
@@ -404,6 +414,9 @@ export default function App(): JSX.Element {
         <header className="workspace-toolbar">
           <p className="toolbar-title">Spatial camera-object inspection</p>
           <div className="status-block" aria-label="workspace status">
+            <button type="button" className="toolbar-button" onClick={handleResetToDefaults}>
+              Reset to defaults
+            </button>
             {loading ? (
               <span className="status-pill">Computing…</span>
             ) : (
