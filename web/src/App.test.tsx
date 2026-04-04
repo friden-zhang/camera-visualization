@@ -2,6 +2,27 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+interface MockPersistedLayoutState {
+  panelWidth: number;
+  sceneHeight: number;
+  imageWidth: number;
+}
+
+const persistenceMock = vi.hoisted(() => ({
+  loadPersistedInputState: vi.fn<
+    () => Promise<{ request: unknown | null; overlayUrl: string | null }>
+  >(async () => ({ request: null, overlayUrl: null })),
+  loadPersistedLayout: vi.fn<() => MockPersistedLayoutState | null>(() => null),
+  resolvePersistedRequest: vi.fn<(schema: unknown, rawRequest: unknown) => unknown | null>(
+    (_: unknown, rawRequest: unknown) => rawRequest
+  ),
+  savePersistedRequest: vi.fn(),
+  savePersistedLayout: vi.fn(),
+  savePersistedOverlayUrl: vi.fn(async () => undefined)
+}));
+
+vi.mock("./lib/persistence", () => persistenceMock);
+
 import App from "./App";
 import "./styles.css";
 
@@ -373,6 +394,15 @@ function mockElementRect(
 
 describe("App", () => {
   beforeEach(() => {
+    persistenceMock.loadPersistedInputState.mockResolvedValue({ request: null, overlayUrl: null });
+    persistenceMock.loadPersistedLayout.mockReturnValue(null);
+    persistenceMock.resolvePersistedRequest.mockImplementation((_: unknown, rawRequest: unknown) =>
+      rawRequest ?? null
+    );
+    persistenceMock.savePersistedRequest.mockClear();
+    persistenceMock.savePersistedLayout.mockClear();
+    persistenceMock.savePersistedOverlayUrl.mockClear();
+
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
@@ -419,6 +449,53 @@ describe("App", () => {
     await user.click(screen.getByLabelText(/show bbox/i));
     await new Promise((resolve) => window.setTimeout(resolve, 250));
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("restores persisted request, layout, and overlay, then recomputes from restored inputs", async () => {
+    const persistedRequest = {
+      ...schemaPayload.defaults,
+      camera_intrinsics: {
+        ...schemaPayload.defaults.camera_intrinsics,
+        fx: 1024
+      },
+      object_spec: {
+        ...schemaPayload.object_types.find((item) => item.type === "bicycle")!.defaults,
+        pose: {
+          ...objectPose,
+          x: 1.2
+        }
+      }
+    };
+
+    persistenceMock.loadPersistedLayout.mockReturnValue({
+      panelWidth: 420,
+      sceneHeight: 380,
+      imageWidth: 720
+    });
+    persistenceMock.loadPersistedInputState.mockResolvedValue({
+      request: persistedRequest,
+      overlayUrl: "data:image/png;base64,AAAA"
+    });
+
+    render(<App />);
+
+    await screen.findByDisplayValue("1024");
+    await screen.findByLabelText(/wheel diameter/i);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    const shell = document.querySelector(".app-shell");
+    expect(shell).not.toBeNull();
+    expect((shell as HTMLElement).style.gridTemplateColumns).toBe("420px 12px minmax(0, 1fr)");
+
+    const overlayImage = document.querySelector("image[href='data:image/png;base64,AAAA']");
+    expect(overlayImage).not.toBeNull();
+
+    const evaluateCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(evaluateCall).toBeDefined();
+    const evaluateBody = JSON.parse(String(evaluateCall[1]?.body));
+    expect(evaluateBody.camera_intrinsics.fx).toBe(1024);
+    expect(evaluateBody.object_spec.type).toBe("bicycle");
+    expect(evaluateBody.object_spec.pose.x).toBe(1.2);
   });
 
   it("renders schema-driven object controls and switches parameter sets by object type", async () => {

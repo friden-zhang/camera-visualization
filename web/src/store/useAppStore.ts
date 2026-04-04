@@ -27,7 +27,13 @@ interface AppState {
   hoveredPointId: string | null;
   selectedPointId: string | null;
   overlayUrl: string | null;
-  initializeFromSchema: (schema: ProjectionSchema) => void;
+  initializeFromSchema: (
+    schema: ProjectionSchema,
+    restored?: {
+      request?: ProjectionRequest | null;
+      overlayUrl?: string | null;
+    }
+  ) => void;
   setProjection: (projection: ProjectionResult) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -89,15 +95,16 @@ export const useAppStore = create<AppState>((set) => ({
   hoveredPointId: null,
   selectedPointId: null,
   overlayUrl: null,
-  initializeFromSchema: (schema) =>
+  initializeFromSchema: (schema, restored) =>
     set({
       schema,
-      request: cloneValue(schema.defaults),
+      request: cloneValue(restored?.request ?? schema.defaults),
       projection: null,
       error: null,
       geometryRevision: 1,
       hoveredPointId: null,
-      selectedPointId: null
+      selectedPointId: null,
+      overlayUrl: restored?.overlayUrl ?? null
     }),
   setProjection: (projection) => set({ projection, loading: false, error: null }),
   setLoading: (loading) => set({ loading }),

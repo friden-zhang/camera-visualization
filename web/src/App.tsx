@@ -15,6 +15,15 @@ import { ImageProjectionView } from "./components/ImageProjectionView";
 import { ParameterPanel } from "./components/ParameterPanel";
 import { Scene3DView } from "./components/Scene3DView";
 import { evaluateProjection, fetchSchema } from "./lib/api";
+import {
+  loadPersistedInputState,
+  loadPersistedLayout,
+  resolvePersistedRequest,
+  savePersistedLayout,
+  savePersistedOverlayUrl,
+  savePersistedRequest,
+  type PersistedLayoutState
+} from "./lib/persistence";
 import { useAppStore } from "./store/useAppStore";
 
 const DESKTOP_BREAKPOINT = 1100;
@@ -44,6 +53,12 @@ interface LayoutState {
   sceneHeight: number;
   imageWidth: number;
 }
+
+const DEFAULT_LAYOUT: PersistedLayoutState = {
+  panelWidth: 360,
+  sceneHeight: 440,
+  imageWidth: 940
+};
 
 interface ResizeHandleProps {
   label: string;
@@ -92,19 +107,30 @@ function useSchemaBootstrap(): void {
 
   useEffect(() => {
     let active = true;
-    void fetchSchema()
-      .then((schema) => {
+    void (async () => {
+      try {
+        const [schema, persistedInput] = await Promise.all([
+          fetchSchema(),
+          loadPersistedInputState()
+        ]);
         if (!active) {
           return;
         }
-        startTransition(() => initializeFromSchema(schema));
-      })
-      .catch((error: unknown) => {
+        const restoredRequest = resolvePersistedRequest(schema, persistedInput.request);
+        startTransition(() =>
+          initializeFromSchema(schema, {
+            request: restoredRequest,
+            overlayUrl: persistedInput.overlayUrl
+          })
+        );
+      } catch (error: unknown) {
         if (!active) {
           return;
         }
         setError(error instanceof Error ? error.message : "Failed to load schema");
-      });
+      }
+    })();
+
     return () => {
       active = false;
     };
@@ -161,15 +187,12 @@ export default function App(): JSX.Element {
   const workspaceSecondaryRef = useRef<HTMLDivElement>(null);
   const dragTargetRef = useRef<DragTarget | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
-  const [layout, setLayout] = useState<LayoutState>({
-    panelWidth: 360,
-    sceneHeight: 440,
-    imageWidth: 940
-  });
+  const [layout, setLayout] = useState<LayoutState>(() => loadPersistedLayout() ?? DEFAULT_LAYOUT);
   const request = useAppStore((state) => state.request);
   const projection = useDeferredValue(useAppStore((state) => state.projection));
   const loading = useAppStore((state) => state.loading);
   const error = useAppStore((state) => state.error);
+  const overlayUrl = useAppStore((state) => state.overlayUrl);
   const isDesktopLayout = viewportWidth > DESKTOP_BREAKPOINT;
 
   const stopDragging = useEffectEvent(() => {
@@ -299,6 +322,21 @@ export default function App(): JSX.Element {
       stopDragging();
     };
   }, [handlePointerMove, stopDragging]);
+
+  useEffect(() => {
+    if (!request) {
+      return;
+    }
+    savePersistedRequest(request);
+  }, [request]);
+
+  useEffect(() => {
+    savePersistedLayout(layout);
+  }, [layout]);
+
+  useEffect(() => {
+    void savePersistedOverlayUrl(overlayUrl);
+  }, [overlayUrl]);
 
   const startDragging = (dragTarget: DragTarget, cursor: "col-resize" | "row-resize") =>
     (event: ReactPointerEvent<HTMLDivElement>): void => {
