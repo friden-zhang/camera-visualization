@@ -25,17 +25,15 @@ def build_payload() -> dict[str, object]:
         },
         "camera_pose": {"x": 0.0, "y": -3.0, "z": 1.6, "yaw": 0.0, "pitch": 5.0, "roll": 0.0},
         "object_spec": {
-            "type": "custom_points",
-            "pose": {"x": 0.0, "y": 12.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0, "roll": 0.0},
-            "points": [
-                {"id": "a", "x": -1.0, "y": 0.0, "z": 0.0},
-                {"id": "b", "x": 1.0, "y": 0.0, "z": 0.0},
-                {"id": "c", "x": 0.0, "y": 0.0, "z": 2.0},
-            ],
-            "edges": [
-                {"start_id": "a", "end_id": "b"},
-                {"start_id": "b", "end_id": "c"},
-            ],
+            "type": "sedan",
+            "length": 4.6,
+            "width": 1.82,
+            "height": 1.48,
+            "wheelbase": 2.75,
+            "roof_height": 1.18,
+            "hood_length": 1.1,
+            "trunk_length": 0.9,
+            "pose": {"x": 0.0, "y": 14.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0, "roll": 0.0},
         },
         "display_options": {
             "show_frustum": True,
@@ -48,35 +46,70 @@ def build_payload() -> dict[str, object]:
     }
 
 
-def test_schema_endpoint_exposes_supported_types_and_defaults() -> None:
+def test_schema_endpoint_exposes_supported_object_definitions_and_defaults() -> None:
     client = TestClient(build_app())
 
     response = client.get("/api/schema")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["object_types"] == ["box", "rectangle", "custom_points"]
+    assert [item["type"] for item in payload["object_types"]] == [
+        "sedan",
+        "truck",
+        "bicycle",
+        "pedestrian",
+        "traffic_cone",
+        "custom_points",
+    ]
+    assert payload["defaults"]["object_spec"]["type"] == "sedan"
+    sedan = next(item for item in payload["object_types"] if item["type"] == "sedan")
+    assert any(parameter["name"] == "wheelbase" for parameter in sedan["parameters"])
     assert payload["distortion_models"] == ["opencv", "fisheye"]
-    assert payload["defaults"]["camera_intrinsics"]["image_width"] == 1280
 
 
-def test_evaluate_projection_returns_points_bbox_and_analysis() -> None:
+def test_evaluate_projection_returns_landmarks_mesh_silhouette_and_analysis() -> None:
     client = TestClient(build_app())
 
     response = client.post("/api/projection/evaluate", json=build_payload())
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["projected_points"]) == 3
+    assert payload["object_type"] == "sedan"
+    assert len(payload["projected_points"]) > 0
+    assert len(payload["display_mesh"]["vertices"]) > 0
+    assert len(payload["display_mesh"]["faces"]) > 0
+    assert len(payload["silhouette"]["distorted"]) > 0
     assert payload["bbox"]["width"] > 0.0
-    assert payload["analysis"]["visible_point_count"] == 3
+    assert payload["analysis"]["coverage_ratio"] > 0.0
     assert payload["center"]["point_id"] == "object_center"
 
 
 def test_invalid_custom_point_topology_returns_validation_error() -> None:
     client = TestClient(build_app())
     payload = build_payload()
-    payload["object_spec"]["edges"].append({"start_id": "missing", "end_id": "a"})
+    payload["object_spec"] = {
+        "type": "custom_points",
+        "pose": {"x": 0.0, "y": 12.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0, "roll": 0.0},
+        "points": [
+            {"id": "a", "x": -1.0, "y": 0.0, "z": 0.0},
+            {"id": "b", "x": 1.0, "y": 0.0, "z": 0.0},
+            {"id": "c", "x": 0.0, "y": 0.0, "z": 2.0},
+        ],
+        "edges": [
+            {"start_id": "a", "end_id": "b"},
+            {"start_id": "missing", "end_id": "a"},
+        ],
+    }
+
+    response = client.post("/api/projection/evaluate", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_invalid_parameterized_object_payload_returns_validation_error() -> None:
+    client = TestClient(build_app())
+    payload = build_payload()
+    payload["object_spec"]["wheelbase"] = -1.0
 
     response = client.post("/api/projection/evaluate", json=payload)
 

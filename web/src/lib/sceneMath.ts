@@ -114,12 +114,18 @@ export function sceneFrame(
   target: SceneVector;
   orbitPosition: SceneVector;
   groundSize: number;
+  groundCenter: SceneVector;
 } {
   const cameraWorld: Vector3 = {
     x: request.camera_pose.x,
     y: request.camera_pose.y,
     z: request.camera_pose.z
   };
+  const meshVertices = projection?.display_mesh.vertices ?? [];
+  const worldPoints =
+    meshVertices.length > 0
+      ? meshVertices
+      : projection?.projected_points.map((point) => point.world) ?? [];
   const objectWorld =
     projection?.center.world ?? {
       x: request.object_spec.pose.x,
@@ -128,38 +134,47 @@ export function sceneFrame(
     };
   const cameraScene = worldToScene(cameraWorld);
   const objectScene = worldToScene(objectWorld);
-  const target: SceneVector = [
-    (cameraScene[0] + objectScene[0]) / 2,
-    Math.max(objectScene[1], cameraScene[1] * 0.2) + 0.35,
-    (cameraScene[2] + objectScene[2]) / 2
-  ];
-  const distance = Math.max(
-    10,
-    Math.hypot(
-      objectWorld.x - cameraWorld.x,
-      objectWorld.y - cameraWorld.y,
-      objectWorld.z - cameraWorld.z
-    )
+  const cameraToObjectDistance = Math.hypot(
+    objectWorld.x - cameraWorld.x,
+    objectWorld.y - cameraWorld.y,
+    objectWorld.z - cameraWorld.z
   );
-  const orbitPosition: SceneVector = [
-    target[0] + distance * 0.42,
-    target[1] + distance * 0.24,
-    target[2] - distance * 0.52
+  const maxObjectHeight =
+    worldPoints.length > 0 ? Math.max(...worldPoints.map((point) => point.z)) : objectWorld.z;
+  const minX = worldPoints.length > 0 ? Math.min(...worldPoints.map((point) => point.x)) : objectWorld.x;
+  const maxX = worldPoints.length > 0 ? Math.max(...worldPoints.map((point) => point.x)) : objectWorld.x;
+  const minY = worldPoints.length > 0 ? Math.min(...worldPoints.map((point) => point.y)) : objectWorld.y;
+  const maxY = worldPoints.length > 0 ? Math.max(...worldPoints.map((point) => point.y)) : objectWorld.y;
+  const objectSpan = Math.max(maxX - minX, maxY - minY, maxObjectHeight, 2);
+  const objectCenterX = (minX + maxX) / 2;
+  const objectCenterY = (minY + maxY) / 2;
+  const target: SceneVector = [
+    objectCenterX,
+    Math.max(objectScene[1] + maxObjectHeight * 0.16, maxObjectHeight * 0.52, 0.72),
+    objectCenterY
   ];
+  const lookDistance = Math.max(16, cameraToObjectDistance * 0.92, objectSpan * 5.6);
+  const orbitOffset = scale(normalize([0.68, 0.52, -0.92]), lookDistance);
+  const orbitPosition = add(target, orbitOffset);
 
-  const worldPoints = projection?.projected_points.map((point) => point.world) ?? [];
   const worldXs = [cameraWorld.x, objectWorld.x, ...worldPoints.map((point) => point.x)];
   const worldYs = [cameraWorld.y, objectWorld.y, ...worldPoints.map((point) => point.y)];
+  const groundCenter: SceneVector = [
+    (Math.max(...worldXs) + Math.min(...worldXs)) / 2,
+    0,
+    (Math.max(...worldYs) + Math.min(...worldYs)) / 2
+  ];
   const groundSize = Math.max(
-    20,
-    (Math.max(...worldXs) - Math.min(...worldXs) + Math.max(...worldYs) - Math.min(...worldYs)) * 1.5
+    26,
+    (Math.max(...worldXs) - Math.min(...worldXs) + Math.max(...worldYs) - Math.min(...worldYs)) * 2.4
   );
 
   return {
     cameraPosition: cameraScene,
     target,
     orbitPosition,
-    groundSize
+    groundSize,
+    groundCenter
   };
 }
 

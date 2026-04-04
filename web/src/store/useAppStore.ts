@@ -8,6 +8,7 @@ import {
   type DisplayOptions,
   type DistortionModel,
   type ObjectSpec,
+  type ObjectTypeDefinition,
   type Pose3D,
   type ProjectionRequest,
   type ProjectionResult,
@@ -35,7 +36,7 @@ interface AppState {
   setDistortionModel: (model: DistortionModel["model"]) => void;
   setCameraPoseValue: (key: keyof Pose3D, value: number) => void;
   setObjectPoseValue: (key: keyof Pose3D, value: number) => void;
-  setObjectDimension: (key: "width" | "length" | "height", value: number) => void;
+  setObjectParameter: (key: string, value: number) => void;
   setObjectType: (type: ObjectType) => void;
   setCustomObjectDefinition: (definition: CustomObjectDefinition) => void;
   setDisplayOption: (key: keyof DisplayOptions, value: boolean) => void;
@@ -44,55 +45,31 @@ interface AppState {
   setOverlayUrl: (url: string | null) => void;
 }
 
-const defaultPose = (): Pose3D => ({
-  x: 0,
-  y: 0,
-  z: 0,
-  yaw: 0,
-  pitch: 0,
-  roll: 0
-});
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
-function defaultObjectSpec(type: ObjectType): ObjectSpec {
-  if (type === "rectangle") {
-    return {
-      type,
-      width: 2,
-      length: 4,
-      pose: defaultPose()
-    };
+function getObjectDefinition(
+  schema: ProjectionSchema | null,
+  type: ObjectType
+): ObjectTypeDefinition | null {
+  return schema?.object_types.find((definition) => definition.type === type) ?? null;
+}
+
+function buildObjectSpecFromSchema(
+  schema: ProjectionSchema | null,
+  type: ObjectType,
+  pose?: Pose3D
+): ObjectSpec | null {
+  const definition = getObjectDefinition(schema, type);
+  if (!definition) {
+    return null;
   }
-  if (type === "custom_points") {
-    return {
-      type,
-      pose: defaultPose(),
-      points: [
-        { id: "a", x: -1, y: -1, z: 0 },
-        { id: "b", x: 1, y: -1, z: 0 },
-        { id: "c", x: 1, y: 1, z: 0 },
-        { id: "d", x: -1, y: 1, z: 0 },
-        { id: "e", x: 0, y: 0, z: 2 }
-      ],
-      edges: [
-        { start_id: "a", end_id: "b" },
-        { start_id: "b", end_id: "c" },
-        { start_id: "c", end_id: "d" },
-        { start_id: "d", end_id: "a" },
-        { start_id: "a", end_id: "e" },
-        { start_id: "b", end_id: "e" },
-        { start_id: "c", end_id: "e" },
-        { start_id: "d", end_id: "e" }
-      ],
-      faces: []
-    };
-  }
+  const defaults = cloneValue(definition.defaults);
   return {
-    type: "box",
-    width: 1.8,
-    length: 4.4,
-    height: 1.5,
-    pose: defaultPose()
-  };
+    ...defaults,
+    pose: pose ?? defaults.pose
+  } as ObjectSpec;
 }
 
 function updateRequest(
@@ -115,10 +92,12 @@ export const useAppStore = create<AppState>((set) => ({
   initializeFromSchema: (schema) =>
     set({
       schema,
-      request: schema.defaults,
+      request: cloneValue(schema.defaults),
       projection: null,
       error: null,
-      geometryRevision: 1
+      geometryRevision: 1,
+      hoveredPointId: null,
+      selectedPointId: null
     }),
   setProjection: (projection) => set({ projection, loading: false, error: null }),
   setLoading: (loading) => set({ loading }),
@@ -181,7 +160,7 @@ export const useAppStore = create<AppState>((set) => ({
       })),
       geometryRevision: state.geometryRevision + 1
     })),
-  setObjectDimension: (key, value) =>
+  setObjectParameter: (key, value) =>
     set((state) => ({
       request: updateRequest(state.request, (request) => {
         if (request.object_spec.type === "custom_points") {
@@ -192,21 +171,26 @@ export const useAppStore = create<AppState>((set) => ({
           object_spec: {
             ...request.object_spec,
             [key]: value
-          }
+          } as ObjectSpec
         };
       }),
       geometryRevision: state.geometryRevision + 1
     })),
   setObjectType: (type) =>
-    set((state) => ({
-      request: updateRequest(state.request, (request) => ({
-        ...request,
-        object_spec: defaultObjectSpec(type)
-      })),
-      geometryRevision: state.geometryRevision + 1,
-      selectedPointId: null,
-      hoveredPointId: null
-    })),
+    set((state) => {
+      const pose = state.request?.object_spec.pose;
+      const nextSpec =
+        buildObjectSpecFromSchema(state.schema, type, pose) ?? state.request?.object_spec ?? null;
+      return {
+        request: updateRequest(state.request, (request) => ({
+          ...request,
+          object_spec: nextSpec ?? request.object_spec
+        })),
+        geometryRevision: state.geometryRevision + 1,
+        selectedPointId: null,
+        hoveredPointId: null
+      };
+    }),
   setCustomObjectDefinition: (definition) =>
     set((state) => ({
       request: updateRequest(state.request, (request) => {

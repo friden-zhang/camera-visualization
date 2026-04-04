@@ -1,0 +1,25 @@
+{
+  "type": "pedestrian",
+  "label": "Pedestrian",
+  "parameters": [
+    {"name": "body_height", "label": "Body Height", "group": "Body", "min": 1.2, "max": 2.2, "step": 0.01},
+    {"name": "shoulder_width", "label": "Shoulder Width", "group": "Body", "min": 0.3, "max": 0.7, "step": 0.01},
+    {"name": "torso_depth", "label": "Torso Depth", "group": "Body", "min": 0.18, "max": 0.45, "step": 0.01},
+    {"name": "hip_width", "label": "Hip Width", "group": "Body", "min": 0.22, "max": 0.55, "step": 0.01},
+    {"name": "head_scale", "label": "Head Scale", "group": "Body", "min": 0.7, "max": 1.3, "step": 0.01}
+  ],
+  "defaults": {
+    "body_height": 1.74,
+    "shoulder_width": 0.46,
+    "torso_depth": 0.26,
+    "hip_width": 0.34,
+    "head_scale": 1.0
+  },
+  "landmarks": [
+    "head_top",
+    "shoulder_center",
+    "hip_center",
+    "left_foot_center",
+    "right_foot_center"
+  ]
+}

@@ -8,7 +8,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from camviz.api.models import (
-    BoxSpec,
     CameraIntrinsics,
     DisplayOptions,
     DistortionModel,
@@ -18,6 +17,7 @@ from camviz.api.models import (
     ProjectionSchema,
 )
 from camviz.core.engine import evaluate_projection
+from camviz.core.object_assets import build_object_type_definitions, build_parameterized_spec
 
 
 def build_default_request() -> ProjectionRequest:
@@ -32,20 +32,14 @@ def build_default_request() -> ProjectionRequest:
         ),
         distortion=DistortionModel(),
         camera_pose=Pose3D(x=0.0, y=-4.0, z=1.7, yaw=0.0, pitch=5.0, roll=0.0),
-        object_spec=BoxSpec(
-            type="box",
-            width=1.8,
-            length=4.4,
-            height=1.5,
-            pose=Pose3D(x=0.0, y=14.0, z=0.0, yaw=0.0, pitch=0.0, roll=0.0),
-        ),
+        object_spec=build_parameterized_spec("sedan", pose=Pose3D(x=0.0, y=14.0, z=0.0)),
         display_options=DisplayOptions(),
     )
 
 
 def build_schema() -> ProjectionSchema:
     return ProjectionSchema(
-        object_types=["box", "rectangle", "custom_points"],
+        object_types=build_object_type_definitions(),
         distortion_models=["opencv", "fisheye"],
         defaults=build_default_request(),
     )
@@ -68,7 +62,7 @@ def build_app() -> FastAPI:
     def schema() -> ProjectionSchema:
         return build_schema()
 
-    @app.post("/api/projection/evaluate")
+    @app.post("/api/projection/evaluate", response_model=ProjectionResult)
     def evaluate(request: ProjectionRequest) -> ProjectionResult:
         return evaluate_projection(request)
 
@@ -87,3 +81,4 @@ def build_app() -> FastAPI:
 
 
 app = build_app()
+

@@ -32,10 +32,14 @@ const request: ProjectionRequest = {
     roll: 0
   },
   object_spec: {
-    type: "box",
-    width: 1.8,
-    length: 4.4,
-    height: 1.5,
+    type: "sedan",
+    length: 4.6,
+    width: 1.82,
+    height: 1.46,
+    wheelbase: 2.75,
+    roof_height: 1.34,
+    hood_length: 1.05,
+    trunk_length: 0.9,
     pose: {
       x: 0,
       y: 14,
@@ -56,141 +60,129 @@ const request: ProjectionRequest = {
 };
 
 const projection: ProjectionResult = {
+  object_type: "sedan",
   projected_points: [
     {
-      point_id: "p0",
-      world: { x: -0.9, y: 11.8, z: 0 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
+      point_id: "front_left_wheel_center",
+      world: { x: -0.72, y: 15.35, z: 0.33 },
+      camera: { x: -0.72, y: 0.05, z: 19.4 },
+      undistorted_image: { x: 604, y: 362 },
+      distorted_image: { x: 603, y: 363 },
       visible: true,
       inside_image: true,
       inside_image_undistorted: true
     },
     {
-      point_id: "p1",
-      world: { x: 0.9, y: 11.8, z: 0 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
+      point_id: "front_right_wheel_center",
+      world: { x: 0.72, y: 15.35, z: 0.33 },
+      camera: { x: 0.72, y: 0.05, z: 19.4 },
+      undistorted_image: { x: 676, y: 362 },
+      distorted_image: { x: 677, y: 363 },
       visible: true,
       inside_image: true,
       inside_image_undistorted: true
     },
     {
-      point_id: "p2",
-      world: { x: 0.9, y: 16.2, z: 0 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
+      point_id: "rear_left_wheel_center",
+      world: { x: -0.72, y: 12.65, z: 0.33 },
+      camera: { x: -0.72, y: 0.02, z: 16.65 },
+      undistorted_image: { x: 598, y: 372 },
+      distorted_image: { x: 597, y: 373 },
       visible: true,
       inside_image: true,
       inside_image_undistorted: true
     },
     {
-      point_id: "p3",
-      world: { x: -0.9, y: 16.2, z: 0 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
-      visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
-    },
-    {
-      point_id: "p4",
-      world: { x: -0.9, y: 11.8, z: 1.5 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
-      visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
-    },
-    {
-      point_id: "p5",
-      world: { x: 0.9, y: 11.8, z: 1.5 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
-      visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
-    },
-    {
-      point_id: "p6",
-      world: { x: 0.9, y: 16.2, z: 1.5 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
-      visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
-    },
-    {
-      point_id: "p7",
-      world: { x: -0.9, y: 16.2, z: 1.5 },
-      camera: { x: 0, y: 0, z: 0 },
-      undistorted_image: { x: 0, y: 0 },
-      distorted_image: { x: 0, y: 0 },
+      point_id: "rear_right_wheel_center",
+      world: { x: 0.72, y: 12.65, z: 0.33 },
+      camera: { x: 0.72, y: 0.02, z: 16.65 },
+      undistorted_image: { x: 682, y: 372 },
+      distorted_image: { x: 683, y: 373 },
       visible: true,
       inside_image: true,
       inside_image_undistorted: true
     }
   ],
-  edges: [
-    { start_id: "p0", end_id: "p1" },
-    { start_id: "p1", end_id: "p2" },
-    { start_id: "p2", end_id: "p3" },
-    { start_id: "p3", end_id: "p0" },
-    { start_id: "p4", end_id: "p5" },
-    { start_id: "p5", end_id: "p6" },
-    { start_id: "p6", end_id: "p7" },
-    { start_id: "p7", end_id: "p4" }
-  ],
+  edges: [],
   faces: [],
   center: {
     point_id: "object_center",
     world: { x: 0, y: 14, z: 0.75 },
-    camera: { x: 0, y: 0, z: 0 },
-    undistorted_image: { x: 640, y: 320 },
-    distorted_image: { x: 640, y: 320 },
+    camera: { x: 0, y: -0.62, z: 18.01 },
+    undistorted_image: { x: 640, y: 325.83 },
+    distorted_image: { x: 640, y: 326.83 },
     visible: true,
     inside_image: true,
     inside_image_undistorted: true
   },
   bbox: {
-    min_x: 0,
-    max_x: 0,
-    min_y: 0,
-    max_y: 0,
-    width: 0,
-    height: 0,
+    min_x: 585,
+    max_x: 695,
+    min_y: 282,
+    max_y: 378,
+    width: 110,
+    height: 96,
     inside_image: true,
     intersects_image: true
   },
   undistorted_bbox: {
-    min_x: 0,
-    max_x: 0,
-    min_y: 0,
-    max_y: 0,
-    width: 0,
-    height: 0,
+    min_x: 586,
+    max_x: 694,
+    min_y: 281,
+    max_y: 377,
+    width: 108,
+    height: 96,
     inside_image: true,
     intersects_image: true
   },
   principal_point: { x: 640, y: 360 },
   analysis: {
-    pixel_width: 0,
-    pixel_height: 0,
-    coverage_ratio: 0,
-    distortion_mean_offset_px: 0,
-    distortion_max_offset_px: 0,
-    visible_point_count: 8,
+    pixel_width: 110,
+    pixel_height: 96,
+    coverage_ratio: 0.012,
+    distortion_mean_offset_px: 0.92,
+    distortion_max_offset_px: 1.31,
+    visible_point_count: 4,
     hidden_point_count: 0,
     center_inside_image: true,
     bbox_intersects_image: true,
     bbox_inside_image: true
+  },
+  display_mesh: {
+    vertices: [
+      { x: -0.91, y: 11.7, z: 0.28 },
+      { x: 0.91, y: 11.7, z: 0.28 },
+      { x: 0.91, y: 16.3, z: 0.28 },
+      { x: -0.91, y: 16.3, z: 0.28 }
+    ],
+    faces: [
+      { vertex_indices: [0, 1, 2], label: "body" },
+      { vertex_indices: [0, 2, 3], label: "body" }
+    ]
+  },
+  silhouette: {
+    distorted: [
+      {
+        points: [
+          { x: 592, y: 376 },
+          { x: 587, y: 312 },
+          { x: 640, y: 282 },
+          { x: 693, y: 312 },
+          { x: 688, y: 376 }
+        ]
+      }
+    ],
+    undistorted: [
+      {
+        points: [
+          { x: 593, y: 375 },
+          { x: 588, y: 311 },
+          { x: 640, y: 281 },
+          { x: 692, y: 311 },
+          { x: 687, y: 375 }
+        ]
+      }
+    ]
   }
 };
 
@@ -201,9 +193,9 @@ describe("projectionMath ground surface", () => {
     expect(surface).toHaveLength(4);
     expect(surface.every((corner) => corner.distorted_image)).toBe(true);
 
-    const footprintProjection = projection.projected_points
-      .filter((point) => point.world.z === 0)
-      .map((point) => projectWorldPoint(point.world, request));
+    const footprintProjection = projection.projected_points.map((point) =>
+      projectWorldPoint({ ...point.world, z: 0 }, request)
+    );
     const footprintBottom = Math.max(
       ...footprintProjection.map((point) => point.distorted_image?.y ?? -Infinity)
     );

@@ -1,13 +1,22 @@
 import { useMemo, type JSX } from "react";
 
 import { useAppStore } from "../store/useAppStore";
-import { type Point2D, type ProjectionRequest, type ProjectionResult } from "../types";
+import { type Contour2D, type Point2D, type ProjectionRequest, type ProjectionResult } from "../types";
 import { buildGroundProjectionSegments, buildGroundProjectionSurface } from "../lib/projectionMath";
 
 interface ImageProjectionViewProps {
   request: ProjectionRequest;
   projection: ProjectionResult | null;
 }
+
+const SILHOUETTE_CLASS_BY_TYPE: Record<string, string> = {
+  sedan: "object-silhouette-sedan",
+  truck: "object-silhouette-truck",
+  bicycle: "object-silhouette-bicycle",
+  pedestrian: "object-silhouette-pedestrian",
+  traffic_cone: "object-silhouette-traffic-cone",
+  custom_points: "object-silhouette-custom"
+};
 
 function imagePointForDisplay(point: {
   distorted_image: Point2D | null;
@@ -22,12 +31,17 @@ function imagePointForDisplay(point: {
   return point.distorted_image ?? point.undistorted_image;
 }
 
+function contourPoints(contour: Contour2D): string | null {
+  if (contour.points.length < 3) {
+    return null;
+  }
+  return contour.points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
 function renderPoint(
   point: Point2D | null,
   pointId: string,
   className: string,
-  request: ProjectionRequest,
-  showLabels: boolean,
   onHover: (pointId: string | null) => void,
   onSelect: (pointId: string | null) => void
 ): JSX.Element | null {
@@ -45,11 +59,6 @@ function renderPoint(
         onMouseLeave={() => onHover(null)}
         onClick={() => onSelect(pointId)}
       />
-      {showLabels && (
-        <text x={point.x + 10} y={point.y - 10} className="point-label">
-          {pointId}
-        </text>
-      )}
     </g>
   );
 }
@@ -72,6 +81,9 @@ export function ImageProjectionView({
     () => buildGroundProjectionSegments(request, projection),
     [projection, request]
   );
+  const silhouetteClass = projection
+    ? SILHOUETTE_CLASS_BY_TYPE[projection.object_type] ?? SILHOUETTE_CLASS_BY_TYPE.custom_points
+    : SILHOUETTE_CLASS_BY_TYPE.custom_points;
   const groundPlanePoints = useMemo(() => {
     const points = groundProjectionSurface
       .map((corner) => imagePointForDisplay(corner, request))
@@ -88,6 +100,12 @@ export function ImageProjectionView({
     const end = imagePointForDisplay(farRight, request);
     return start && end ? { start, end } : null;
   }, [groundProjectionSurface, request]);
+  const distortedContours = projection?.silhouette.distorted ?? [];
+  const undistortedContours = projection?.silhouette.undistorted ?? [];
+  const centerPoint = projection ? imagePointForDisplay(projection.center, request) : null;
+  const shouldRenderDebugEdges =
+    projection?.object_type === "custom_points" ||
+    (distortedContours.length === 0 && undistortedContours.length === 0);
 
   return (
     <section className="view-card image-view-card">
@@ -104,18 +122,18 @@ export function ImageProjectionView({
         >
           <defs>
             <linearGradient id="imageSkyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#9ed0f6" />
-              <stop offset="58%" stopColor="#dff0ff" />
-              <stop offset="100%" stopColor="#f8fbff" />
+              <stop offset="0%" stopColor="#8fc6f5" />
+              <stop offset="55%" stopColor="#d8edff" />
+              <stop offset="100%" stopColor="#f7fbff" />
             </linearGradient>
             <radialGradient id="imageSkyGlow" cx="22%" cy="10%" r="68%">
-              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.72)" />
-              <stop offset="54%" stopColor="rgba(255, 255, 255, 0.18)" />
+              <stop offset="0%" stopColor="rgba(255, 255, 255, 0.74)" />
+              <stop offset="54%" stopColor="rgba(255, 255, 255, 0.2)" />
               <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
             </radialGradient>
             <linearGradient id="imageGroundGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#d9e0e6" />
-              <stop offset="100%" stopColor="#bcc7cf" />
+              <stop offset="0%" stopColor="#e8ecef" />
+              <stop offset="100%" stopColor="#cfd7de" />
             </linearGradient>
             <radialGradient id="imageVignette" cx="50%" cy="42%" r="75%">
               <stop offset="60%" stopColor="rgba(0, 0, 0, 0)" />
@@ -190,6 +208,28 @@ export function ImageProjectionView({
                 )}
             </g>
           ))}
+          {request.display_options.show_undistorted &&
+            undistortedContours.map((contour, index) => {
+              const points = contourPoints(contour);
+              return points ? (
+                <polygon
+                  key={`undistorted-silhouette-${index}`}
+                  points={points}
+                  className={`object-silhouette object-silhouette-undistorted ${silhouetteClass}`}
+                />
+              ) : null;
+            })}
+          {request.display_options.show_distorted &&
+            distortedContours.map((contour, index) => {
+              const points = contourPoints(contour);
+              return points ? (
+                <polygon
+                  key={`distorted-silhouette-${index}`}
+                  points={points}
+                  className={`object-silhouette object-silhouette-distorted ${silhouetteClass}`}
+                />
+              ) : null;
+            })}
           {request.display_options.show_bbox && projection && (
             <rect
               x={projection.bbox.min_x}
@@ -205,29 +245,30 @@ export function ImageProjectionView({
             r={5}
             className="principal-point"
           />
-          {projection?.edges.map((edge) => {
-            const start = projection.projected_points.find((point) => point.point_id === edge.start_id);
-            const end = projection.projected_points.find((point) => point.point_id === edge.end_id);
-            const startImage = request.display_options.show_distorted
-              ? start?.distorted_image
-              : start?.undistorted_image;
-            const endImage = request.display_options.show_distorted
-              ? end?.distorted_image
-              : end?.undistorted_image;
-            if (!startImage || !endImage) {
-              return null;
-            }
-            return (
-              <line
-                key={`image-edge-${edge.start_id}-${edge.end_id}`}
-                x1={startImage.x}
-                y1={startImage.y}
-                x2={endImage.x}
-                y2={endImage.y}
-                className="edge-line"
-              />
-            );
-          })}
+          {shouldRenderDebugEdges &&
+            projection?.edges.map((edge) => {
+              const start = projection.projected_points.find((point) => point.point_id === edge.start_id);
+              const end = projection.projected_points.find((point) => point.point_id === edge.end_id);
+              const startImage = request.display_options.show_distorted
+                ? start?.distorted_image
+                : start?.undistorted_image;
+              const endImage = request.display_options.show_distorted
+                ? end?.distorted_image
+                : end?.undistorted_image;
+              if (!startImage || !endImage) {
+                return null;
+              }
+              return (
+                <line
+                  key={`image-edge-${edge.start_id}-${edge.end_id}`}
+                  x1={startImage.x}
+                  y1={startImage.y}
+                  x2={endImage.x}
+                  y2={endImage.y}
+                  className="edge-line"
+                />
+              );
+            })}
           {projection?.projected_points.map((point) => (
             <g key={point.point_id}>
               {request.display_options.show_undistorted &&
@@ -235,8 +276,6 @@ export function ImageProjectionView({
                   point.undistorted_image,
                   point.point_id,
                   point.point_id === activeId ? "image-point point-active-undistorted" : "image-point point-undistorted",
-                  request,
-                  request.display_options.show_labels,
                   setHoveredPointId,
                   setSelectedPointId
                 )}
@@ -245,17 +284,15 @@ export function ImageProjectionView({
                   point.distorted_image,
                   point.point_id,
                   point.point_id === activeId ? "image-point point-active" : "image-point point-distorted",
-                  request,
-                  request.display_options.show_labels,
                   setHoveredPointId,
                   setSelectedPointId
                 )}
             </g>
           ))}
-          {projection?.center.distorted_image && (
+          {centerPoint && (
             <circle
-              cx={projection.center.distorted_image.x}
-              cy={projection.center.distorted_image.y}
+              cx={centerPoint.x}
+              cy={centerPoint.y}
               r={7}
               className="center-point"
             />

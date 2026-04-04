@@ -30,6 +30,11 @@ class Face(BaseModel):
     label: str | None = None
 
 
+class MeshFace(BaseModel):
+    vertex_indices: tuple[int, int, int]
+    label: str | None = None
+
+
 class Pose3D(BaseModel):
     x: float = 0.0
     y: float = 0.0
@@ -69,19 +74,83 @@ class DisplayOptions(BaseModel):
     show_axes: bool = True
 
 
-class BoxSpec(BaseModel):
-    type: Literal["box"]
-    width: PositiveFloat
+class SedanSpec(BaseModel):
+    type: Literal["sedan"]
     length: PositiveFloat
+    width: PositiveFloat
     height: PositiveFloat
+    wheelbase: PositiveFloat
+    roof_height: PositiveFloat
+    hood_length: PositiveFloat
+    trunk_length: PositiveFloat
+    pose: Pose3D = Field(default_factory=Pose3D)
+
+    @model_validator(mode="after")
+    def validate_proportions(self) -> SedanSpec:
+        if self.hood_length + self.trunk_length >= self.length:
+            raise ValueError("sedan hood_length + trunk_length must be less than total length")
+        if self.wheelbase >= self.length:
+            raise ValueError("sedan wheelbase must be less than total length")
+        if self.roof_height > self.height:
+            raise ValueError("sedan roof_height must not exceed total height")
+        return self
+
+
+class TruckSpec(BaseModel):
+    type: Literal["truck"]
+    cab_length: PositiveFloat
+    cargo_length: PositiveFloat
+    cargo_width: PositiveFloat
+    cargo_height: PositiveFloat
+    cab_height: PositiveFloat
+    wheelbase: PositiveFloat
+    pose: Pose3D = Field(default_factory=Pose3D)
+
+    @model_validator(mode="after")
+    def validate_proportions(self) -> TruckSpec:
+        if self.wheelbase >= self.cab_length + self.cargo_length:
+            raise ValueError("truck wheelbase must be shorter than the total truck length")
+        return self
+
+
+class BicycleSpec(BaseModel):
+    type: Literal["bicycle"]
+    wheel_diameter: PositiveFloat
+    wheelbase: PositiveFloat
+    frame_height: PositiveFloat
+    handlebar_width: PositiveFloat
+    saddle_height: PositiveFloat
+    pose: Pose3D = Field(default_factory=Pose3D)
+
+    @model_validator(mode="after")
+    def validate_proportions(self) -> BicycleSpec:
+        if self.saddle_height <= self.wheel_diameter / 2.0:
+            raise ValueError("bicycle saddle_height must be above the wheel radius")
+        return self
+
+
+class PedestrianSpec(BaseModel):
+    type: Literal["pedestrian"]
+    body_height: PositiveFloat
+    shoulder_width: PositiveFloat
+    torso_depth: PositiveFloat
+    hip_width: PositiveFloat
+    head_scale: PositiveFloat
     pose: Pose3D = Field(default_factory=Pose3D)
 
 
-class RectangleSpec(BaseModel):
-    type: Literal["rectangle"]
-    width: PositiveFloat
-    length: PositiveFloat
+class TrafficConeSpec(BaseModel):
+    type: Literal["traffic_cone"]
+    base_diameter: PositiveFloat
+    top_diameter: PositiveFloat
+    cone_height: PositiveFloat
     pose: Pose3D = Field(default_factory=Pose3D)
+
+    @model_validator(mode="after")
+    def validate_proportions(self) -> TrafficConeSpec:
+        if self.top_diameter >= self.base_diameter:
+            raise ValueError("traffic_cone top_diameter must be smaller than base_diameter")
+        return self
 
 
 class CustomPointSpec(BaseModel):
@@ -108,7 +177,10 @@ class CustomPointSpec(BaseModel):
         return self
 
 
-ObjectSpec = Annotated[BoxSpec | RectangleSpec | CustomPointSpec, Field(discriminator="type")]
+ObjectSpec = Annotated[
+    SedanSpec | TruckSpec | BicycleSpec | PedestrianSpec | TrafficConeSpec | CustomPointSpec,
+    Field(discriminator="type"),
+]
 
 
 class ProjectionRequest(BaseModel):
@@ -154,7 +226,22 @@ class ProjectionAnalysis(BaseModel):
     bbox_inside_image: bool
 
 
+class Contour2D(BaseModel):
+    points: list[Point2D]
+
+
+class SilhouetteSet(BaseModel):
+    distorted: list[Contour2D]
+    undistorted: list[Contour2D]
+
+
+class DisplayMesh(BaseModel):
+    vertices: list[Vector3]
+    faces: list[MeshFace]
+
+
 class ProjectionResult(BaseModel):
+    object_type: str
     projected_points: list[PointDiagnostic]
     edges: list[Edge]
     faces: list[Face]
@@ -163,9 +250,28 @@ class ProjectionResult(BaseModel):
     undistorted_bbox: BoundingBox
     principal_point: Point2D
     analysis: ProjectionAnalysis
+    display_mesh: DisplayMesh
+    silhouette: SilhouetteSet
+
+
+class ObjectParameterDefinition(BaseModel):
+    name: str
+    label: str
+    group: str
+    min: float
+    max: float
+    step: float
+
+
+class ObjectTypeDefinition(BaseModel):
+    type: str
+    label: str
+    parameters: list[ObjectParameterDefinition]
+    defaults: ObjectSpec
 
 
 class ProjectionSchema(BaseModel):
-    object_types: list[str]
+    object_types: list[ObjectTypeDefinition]
     distortion_models: list[str]
     defaults: ProjectionRequest
+

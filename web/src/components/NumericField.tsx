@@ -5,13 +5,17 @@ interface NumericFieldProps {
   value: number;
   onCommit: (value: number) => void;
   step?: number;
+  min?: number;
+  max?: number;
 }
 
 export function NumericField({
   label,
   value,
   onCommit,
-  step = 0.1
+  step = 0.1,
+  min,
+  max
 }: NumericFieldProps): JSX.Element {
   const [draft, setDraft] = useState(String(value));
 
@@ -35,6 +39,8 @@ export function NumericField({
         aria-label={label}
         type="number"
         step={step}
+        min={min}
+        max={max}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}

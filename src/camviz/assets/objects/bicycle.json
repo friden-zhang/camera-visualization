@@ -1,0 +1,25 @@
+{
+  "type": "bicycle",
+  "label": "Bicycle",
+  "parameters": [
+    {"name": "wheel_diameter", "label": "Wheel Diameter", "group": "Frame", "min": 0.45, "max": 0.9, "step": 0.01},
+    {"name": "wheelbase", "label": "Wheelbase", "group": "Frame", "min": 0.8, "max": 1.4, "step": 0.01},
+    {"name": "frame_height", "label": "Frame Height", "group": "Frame", "min": 0.35, "max": 0.9, "step": 0.01},
+    {"name": "handlebar_width", "label": "Handlebar Width", "group": "Rider Fit", "min": 0.35, "max": 0.7, "step": 0.01},
+    {"name": "saddle_height", "label": "Saddle Height", "group": "Rider Fit", "min": 0.55, "max": 1.2, "step": 0.01}
+  ],
+  "defaults": {
+    "wheel_diameter": 0.72,
+    "wheelbase": 1.06,
+    "frame_height": 0.58,
+    "handlebar_width": 0.48,
+    "saddle_height": 0.86
+  },
+  "landmarks": [
+    "front_wheel_center",
+    "rear_wheel_center",
+    "handlebar_center",
+    "saddle_center",
+    "bottom_bracket"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "type": "truck",
+  "label": "Truck",
+  "parameters": [
+    {"name": "cab_length", "label": "Cab Length", "group": "Body", "min": 1.6, "max": 3.4, "step": 0.05},
+    {"name": "cargo_length", "label": "Cargo Length", "group": "Body", "min": 3.0, "max": 8.5, "step": 0.1},
+    {"name": "cargo_width", "label": "Cargo Width", "group": "Body", "min": 1.8, "max": 2.8, "step": 0.05},
+    {"name": "cargo_height", "label": "Cargo Height", "group": "Body", "min": 1.8, "max": 3.2, "step": 0.05},
+    {"name": "cab_height", "label": "Cab Height", "group": "Body", "min": 1.6, "max": 2.8, "step": 0.05},
+    {"name": "wheelbase", "label": "Wheelbase", "group": "Body", "min": 3.0, "max": 6.8, "step": 0.1}
+  ],
+  "defaults": {
+    "cab_length": 2.2,
+    "cargo_length": 5.4,
+    "cargo_width": 2.4,
+    "cargo_height": 2.5,
+    "cab_height": 2.2,
+    "wheelbase": 4.8
+  },
+  "landmarks": [
+    "front_bumper_center",
+    "cargo_rear_center",
+    "cargo_roof_center",
+    "front_left_wheel_center",
+    "front_right_wheel_center",
+    "rear_left_wheel_center",
+    "rear_right_wheel_center"
+  ]
+}

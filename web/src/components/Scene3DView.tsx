@@ -1,7 +1,7 @@
-import { useMemo, type JSX } from "react";
+import { useEffect, useMemo, useRef, type ElementRef, type JSX } from "react";
 
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Line } from "@react-three/drei";
+import { Canvas, useThree } from "@react-three/fiber";
+import { Line, OrbitControls } from "@react-three/drei";
 import { BufferGeometry, Float32BufferAttribute } from "three";
 
 import { useAppStore } from "../store/useAppStore";
@@ -16,49 +16,44 @@ import {
   sceneFrame,
   worldToScene
 } from "../lib/sceneMath";
+import { cameraModelQuaternion } from "../lib/cameraModel";
 
 interface Scene3DViewProps {
   request: ProjectionRequest;
   projection: ProjectionResult | null;
 }
 
-function buildSurfaceGeometry(projection: ProjectionResult | null): BufferGeometry | null {
-  if (!projection) {
+const OBJECT_COLORS: Record<string, { fill: string; wire: string }> = {
+  sedan: { fill: "#3f7d84", wire: "#113c40" },
+  truck: { fill: "#4e7e68", wire: "#19392f" },
+  bicycle: { fill: "#8b5e3c", wire: "#4e3019" },
+  pedestrian: { fill: "#8f6a87", wire: "#55394f" },
+  traffic_cone: { fill: "#d67438", wire: "#73371a" },
+  custom_points: { fill: "#57a89e", wire: "#214846" }
+};
+
+function buildDisplayMeshGeometry(projection: ProjectionResult | null): BufferGeometry | null {
+  if (!projection || projection.display_mesh.faces.length === 0) {
     return null;
   }
 
-  const byId = new Map(projection.projected_points.map((point) => [point.point_id, point]));
   const vertices: number[] = [];
 
-  for (const face of projection.faces) {
-    if (face.point_ids.length < 3) {
-      continue;
+  projection.display_mesh.faces.forEach((face) => {
+    const triangle = face.vertex_indices
+      .map((index) => projection.display_mesh.vertices[index])
+      .filter((vertex): vertex is Vector3 => vertex !== undefined);
+
+    if (triangle.length !== 3) {
+      return;
     }
-    const anchor = byId.get(face.point_ids[0]);
-    if (!anchor) {
-      continue;
+
+    if (triangle.every((vertex) => vertex.z < 0)) {
+      return;
     }
-    if (
-      face.point_ids.every((pointId) => {
-        const point = byId.get(pointId);
-        return point ? point.world.z < 0 : true;
-      })
-    ) {
-      continue;
-    }
-    for (let index = 1; index < face.point_ids.length - 1; index += 1) {
-      const second = byId.get(face.point_ids[index]);
-      const third = byId.get(face.point_ids[index + 1]);
-      if (!second || !third) {
-        continue;
-      }
-      vertices.push(
-        ...worldToScene(clampWorldToGround(anchor.world)),
-        ...worldToScene(clampWorldToGround(second.world)),
-        ...worldToScene(clampWorldToGround(third.world))
-      );
-    }
-  }
+
+    triangle.forEach((vertex) => vertices.push(...worldToScene(clampWorldToGround(vertex))));
+  });
 
   if (vertices.length === 0) {
     return null;
@@ -78,16 +73,57 @@ function isWorldSegment(value: [Vector3, Vector3] | null): value is [Vector3, Ve
   return value !== null;
 }
 
+function CameraRigModel({
+  position,
+  quaternion
+}: {
+  position: SceneVector;
+  quaternion: ReturnType<typeof cameraModelQuaternion>;
+}): JSX.Element {
+  return (
+    <group position={position} quaternion={quaternion}>
+      <mesh position={[0, 0.12, -0.38]} castShadow>
+        <boxGeometry args={[0.92, 0.54, 0.62]} />
+        <meshStandardMaterial color="#22292b" roughness={0.5} metalness={0.28} />
+      </mesh>
+      <mesh position={[0, 0.17, -0.36]} castShadow>
+        <boxGeometry args={[0.58, 0.3, 0.7]} />
+        <meshStandardMaterial color="#2d3438" roughness={0.48} metalness={0.22} />
+      </mesh>
+      <mesh position={[0, 0.12, -0.02]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.17, 0.2, 0.38, 28]} />
+        <meshStandardMaterial color="#191f21" roughness={0.46} metalness={0.34} />
+      </mesh>
+      <mesh position={[0, 0.12, 0.12]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.11, 0.15, 0.08, 28]} />
+        <meshStandardMaterial color="#70b4cb" emissive="#0f2732" roughness={0.18} metalness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.46, -0.36]} castShadow>
+        <boxGeometry args={[0.34, 0.12, 0.24]} />
+        <meshStandardMaterial color="#30383c" roughness={0.45} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, -0.1, -0.28]} castShadow>
+        <boxGeometry args={[0.22, 0.12, 0.22]} />
+        <meshStandardMaterial color="#2a3033" roughness={0.5} metalness={0.24} />
+      </mesh>
+    </group>
+  );
+}
+
 function SceneContent({
   request,
   projection
 }: Scene3DViewProps): JSX.Element {
+  const { camera } = useThree();
   const hoveredPointId = useAppStore((state) => state.hoveredPointId);
   const selectedPointId = useAppStore((state) => state.selectedPointId);
   const setHoveredPointId = useAppStore((state) => state.setHoveredPointId);
   const setSelectedPointId = useAppStore((state) => state.setSelectedPointId);
+  const controlsRef = useRef<ElementRef<typeof OrbitControls> | null>(null);
   const activeId = hoveredPointId ?? selectedPointId;
   const frame = useMemo(() => sceneFrame(request, projection), [projection, request]);
+  const meshGeometry = useMemo(() => buildDisplayMeshGeometry(projection), [projection]);
+  const colorSet = OBJECT_COLORS[projection?.object_type ?? request.object_spec.type] ?? OBJECT_COLORS.custom_points;
   const cameraWorld = useMemo(
     () => ({
       x: request.camera_pose.x,
@@ -97,6 +133,10 @@ function SceneContent({
     [request.camera_pose]
   );
   const cameraPosition = useMemo(() => worldToScene(clampWorldToGround(cameraWorld)), [cameraWorld]);
+  const cameraQuaternion = useMemo(
+    () => cameraModelQuaternion(request.camera_pose),
+    [request.camera_pose]
+  );
   const objectCenter = useMemo(
     () => {
       const worldCenter = projection?.center
@@ -122,9 +162,15 @@ function SceneContent({
       cameraToCorners: cornerWorldPoints
         .map((corner) => clipWorldSegmentToGround(cameraWorld, corner))
         .filter(isWorldSegment)
-        .map(([start, end]) => [worldToScene(start), worldToScene(end)] as SceneVector[])
     };
   }, [cameraWorld, frustumDepth, request]);
+  const frustumSegments = useMemo(
+    () =>
+      frustumLines.cameraToCorners.map((segment) =>
+        segment.map((point) => worldToScene(point as Vector3)) as SceneVector[]
+      ),
+    [frustumLines.cameraToCorners]
+  );
   const viewDirection = useMemo(() => {
     const basis = cameraBasis(request.camera_pose);
     const end = {
@@ -137,26 +183,7 @@ function SceneContent({
       ? ([worldToScene(segment[0]), worldToScene(segment[1])] as SceneVector[])
       : null;
   }, [cameraWorld, frustumDepth, request.camera_pose]);
-  const surfaceGeometry = useMemo(() => buildSurfaceGeometry(projection), [projection]);
-  const objectShadow = useMemo(() => {
-    if (!projection) {
-      return [] as SceneVector[][];
-    }
-    return projection.edges
-      .map((edge) => {
-        const start = projection.projected_points.find((point) => point.point_id === edge.start_id);
-        const end = projection.projected_points.find((point) => point.point_id === edge.end_id);
-        if (!start || !end) {
-          return null;
-        }
-        return [
-          worldToScene({ x: start.world.x, y: start.world.y, z: 0 }),
-          worldToScene({ x: end.world.x, y: end.world.y, z: 0 })
-        ];
-      })
-      .filter(isSceneSegment);
-  }, [projection]);
-  const objectLinks = useMemo(
+  const debugEdges = useMemo(
     () =>
       projection?.edges
         .map((edge) => {
@@ -185,54 +212,61 @@ function SceneContent({
     [projection]
   );
   const orbitTarget = useMemo<SceneVector>(
-    () => [frame.target[0], Math.max(frame.target[1], 0.35), frame.target[2]],
+    () => [frame.target[0], Math.max(frame.target[1], 0.3), frame.target[2]],
     [frame.target]
   );
+
+  useEffect(() => {
+    camera.position.set(...frame.orbitPosition);
+    camera.lookAt(...orbitTarget);
+    camera.updateProjectionMatrix();
+    if (controlsRef.current) {
+      controlsRef.current.target.set(...orbitTarget);
+      controlsRef.current.update();
+    }
+  }, [camera, frame.orbitPosition, orbitTarget]);
 
   return (
     <>
       <color attach="background" args={["#f3f8f5"]} />
       <ambientLight intensity={0.95} />
-      <directionalLight position={[14, 18, 10]} intensity={1.35} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+      <directionalLight position={[14, 18, 10]} intensity={1.2} />
+      <directionalLight position={[-10, 8, -8]} intensity={0.45} />
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[frame.groundCenter[0], -0.01, frame.groundCenter[2]]}
+        receiveShadow
+      >
         <planeGeometry args={[frame.groundSize, frame.groundSize]} />
         <meshStandardMaterial color="#edf4ef" />
       </mesh>
       <gridHelper
-        args={[frame.groundSize, Math.max(10, Math.round(frame.groundSize / 2)), "#93afa3", "#dbe7e0"]}
-        position={[0, 0.02, 0]}
+        args={[frame.groundSize, Math.max(10, Math.round(frame.groundSize / 2)), "#94afa4", "#dbe7e0"]}
+        position={[frame.groundCenter[0], 0.02, frame.groundCenter[2]]}
       />
       {request.display_options.show_axes && <axesHelper args={[3]} />}
-      <mesh position={[0, 0.06, 0]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshStandardMaterial color="#102224" />
-      </mesh>
-      {cameraToObjectLine && <Line points={cameraToObjectLine} color="#ffb347" lineWidth={1.5} />}
+      {cameraToObjectLine && <Line points={cameraToObjectLine} color="#ffb347" lineWidth={1.6} />}
       {request.display_options.show_frustum && (
         <>
-          {viewDirection && <Line points={viewDirection} color="#d64545" lineWidth={2.5} />}
-          {frustumLines.cameraToCorners.map((segment, index) => (
+          {viewDirection && <Line points={viewDirection} color="#d64545" lineWidth={2.4} />}
+          {frustumSegments.map((segment, index) => (
             <Line key={`camera-ray-${index}`} points={segment} color="#d64545" lineWidth={1.1} />
           ))}
           <Line points={[...frustumLines.corners, frustumLines.corners[0]]} color="#d64545" lineWidth={1.4} />
         </>
       )}
-      {surfaceGeometry && (
-        <mesh geometry={surfaceGeometry}>
-          <meshStandardMaterial
-            color="#57a89e"
-            transparent
-            opacity={0.18}
-            depthWrite={false}
-            side={2}
-          />
-        </mesh>
+      {meshGeometry && (
+        <>
+          <mesh geometry={meshGeometry}>
+            <meshStandardMaterial color={colorSet.fill} roughness={0.52} metalness={0.06} />
+          </mesh>
+          <mesh geometry={meshGeometry}>
+            <meshBasicMaterial color={colorSet.wire} wireframe transparent opacity={0.18} />
+          </mesh>
+        </>
       )}
-      {objectShadow.map((segment, index) => (
-        <Line key={`shadow-${index}`} points={segment} color="#b7c7bf" lineWidth={1.2} />
-      ))}
-      {objectLinks.map((segment, index) => (
-        <Line key={`scene-link-${index}`} points={segment} color="#2d5f5d" lineWidth={2.2} />
+      {debugEdges.map((segment, index) => (
+        <Line key={`scene-link-${index}`} points={segment} color="#2d5f5d" lineWidth={2} />
       ))}
       {visiblePoints.map((point) => (
         <mesh
@@ -242,23 +276,21 @@ function SceneContent({
           onPointerLeave={() => setHoveredPointId(null)}
           onClick={() => setSelectedPointId(point.point_id)}
         >
-          <sphereGeometry args={[activeId === point.point_id ? 0.18 : 0.12, 16, 16]} />
+          <sphereGeometry args={[activeId === point.point_id ? 0.16 : 0.1, 16, 16]} />
           <meshStandardMaterial color={activeId === point.point_id ? "#d64545" : "#1f8f88"} />
         </mesh>
       ))}
-      <mesh position={cameraPosition}>
-        <sphereGeometry args={[0.23, 16, 16]} />
-        <meshStandardMaterial color="#111c1c" />
-      </mesh>
+      <CameraRigModel position={cameraPosition} quaternion={cameraQuaternion} />
       <mesh position={objectCenter}>
-        <sphereGeometry args={[0.16, 16, 16]} />
+        <sphereGeometry args={[0.15, 16, 16]} />
         <meshStandardMaterial color="#ffb347" />
       </mesh>
-      <mesh position={orbitTarget}>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color="#6b7f7a" />
-      </mesh>
-      <OrbitControls makeDefault target={orbitTarget} maxPolarAngle={Math.PI / 2 - 0.08} />
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        target={orbitTarget}
+        maxPolarAngle={Math.PI / 2 - 0.08}
+      />
     </>
   );
 }
@@ -281,7 +313,7 @@ export function Scene3DView({ request, projection }: Scene3DViewProps): JSX.Elem
         <h2>3D Scene View</h2>
       </header>
       <div className="canvas-shell">
-        <Canvas camera={{ position: sceneFrame(request, projection).orbitPosition, fov: 36 }}>
+        <Canvas camera={{ position: [10, 6, -10], fov: 40 }}>
           <SceneContent request={request} projection={projection} />
         </Canvas>
       </div>

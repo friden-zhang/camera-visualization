@@ -6,21 +6,25 @@ import numpy as np
 
 from camviz.api.models import (
     BoundingBox,
-    BoxSpec,
     CameraIntrinsics,
-    CustomPointSpec,
+    DisplayMesh,
     DistortionModel,
-    Edge,
-    Face,
+    MeshFace,
     Point2D,
     PointDiagnostic,
     ProjectionAnalysis,
     ProjectionRequest,
     ProjectionResult,
-    RectangleSpec,
+    SilhouetteSet,
     Vector3,
 )
-from camviz.core.geometry import build_box_geometry, build_custom_geometry, build_rectangle_geometry
+from camviz.core.object_geometry import generate_object_geometry
+from camviz.core.software_render import (
+    bbox_from_mask,
+    contours_from_mask,
+    coverage_ratio,
+    rasterize_visible_mask,
+)
 from camviz.core.transforms import local_to_world, world_to_camera
 
 
@@ -128,20 +132,6 @@ def _build_bbox(points: list[Point2D | None], intrinsics: CameraIntrinsics) -> B
     )
 
 
-def _coverage_ratio(bbox: BoundingBox, intrinsics: CameraIntrinsics) -> float:
-    if not bbox.intersects_image or bbox.width <= 0.0 or bbox.height <= 0.0:
-        return 0.0
-    clipped_width = max(
-        0.0,
-        min(bbox.max_x, float(intrinsics.image_width)) - max(bbox.min_x, 0.0),
-    )
-    clipped_height = max(
-        0.0,
-        min(bbox.max_y, float(intrinsics.image_height)) - max(bbox.min_y, 0.0),
-    )
-    return clipped_width * clipped_height / float(intrinsics.image_width * intrinsics.image_height)
-
-
 def _diagnostic_from_vectors(
     *,
     point_id: str,
@@ -163,31 +153,57 @@ def _diagnostic_from_vectors(
     )
 
 
-def _geometry_for_spec(
-    object_spec: BoxSpec | RectangleSpec | CustomPointSpec,
-) -> tuple[np.ndarray, list[str], list[Edge], list[Face], np.ndarray]:
-    if isinstance(object_spec, BoxSpec):
-        points, edges, faces, center = build_box_geometry(object_spec)
-    elif isinstance(object_spec, RectangleSpec):
-        points, edges, faces, center = build_rectangle_geometry(object_spec)
-    else:
-        points, edges, faces, center = build_custom_geometry(object_spec)
-    array = np.array([[point.x, point.y, point.z] for point in points], dtype=np.float64)
-    return array, [point.id for point in points], edges, faces, center
+def _project_vertices(
+    camera_vertices: np.ndarray, intrinsics: CameraIntrinsics, distortion: DistortionModel
+) -> tuple[list[Point2D | None], list[Point2D | None]]:
+    undistorted: list[Point2D | None] = []
+    distorted: list[Point2D | None] = []
+    for vertex_camera in camera_vertices:
+        vertex_undistorted, vertex_distorted = _project_image_point(
+            vertex_camera,
+            intrinsics,
+            distortion,
+        )
+        undistorted.append(vertex_undistorted)
+        distorted.append(vertex_distorted)
+    return undistorted, distorted
+
+
+def _mesh_to_display(vertices_world: np.ndarray, mesh_faces: list[MeshFace]) -> DisplayMesh:
+    return DisplayMesh(
+        vertices=[
+            Vector3(x=float(vertex[0]), y=float(vertex[1]), z=float(vertex[2]))
+            for vertex in vertices_world
+        ],
+        faces=list(mesh_faces),
+    )
 
 
 def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
-    local_points, point_ids, edges, faces, local_center = _geometry_for_spec(request.object_spec)
-    world_points = local_to_world(local_points, request.object_spec.pose)
-    center_world = local_to_world(
-        np.array([local_center], dtype=np.float64),
-        request.object_spec.pose,
-    )[0]
-    camera_points = world_to_camera(world_points, request.camera_pose)
-    center_camera = world_to_camera(
-        np.array([center_world], dtype=np.float64),
-        request.camera_pose,
-    )[0]
+    geometry = generate_object_geometry(request.object_spec)
+    if len(geometry.vertices) > 0:
+        world_vertices = local_to_world(geometry.vertices, request.object_spec.pose)
+        camera_vertices = world_to_camera(world_vertices, request.camera_pose)
+    else:
+        world_vertices = np.empty((0, 3), dtype=np.float64)
+        camera_vertices = np.empty((0, 3), dtype=np.float64)
+
+    landmark_ids = list(geometry.landmarks.keys())
+    local_landmarks = (
+        np.array([geometry.landmarks[point_id] for point_id in landmark_ids], dtype=np.float64)
+        if landmark_ids
+        else np.empty((0, 3), dtype=np.float64)
+    )
+    world_landmarks = (
+        local_to_world(local_landmarks, request.object_spec.pose)
+        if len(local_landmarks) > 0
+        else np.empty((0, 3), dtype=np.float64)
+    )
+    camera_landmarks = (
+        world_to_camera(world_landmarks, request.camera_pose)
+        if len(world_landmarks) > 0
+        else np.empty((0, 3), dtype=np.float64)
+    )
 
     projected_points = [
         _diagnostic_from_vectors(
@@ -198,12 +214,21 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
             distortion=request.distortion,
         )
         for point_id, world_point, camera_point in zip(
-            point_ids,
-            world_points,
-            camera_points,
+            landmark_ids,
+            world_landmarks,
+            camera_landmarks,
             strict=True,
         )
     ]
+
+    center_world = local_to_world(
+        np.array([geometry.center], dtype=np.float64),
+        request.object_spec.pose,
+    )[0]
+    center_camera = world_to_camera(
+        np.array([center_world], dtype=np.float64),
+        request.camera_pose,
+    )[0]
     center_point = _diagnostic_from_vectors(
         point_id="object_center",
         world=center_world,
@@ -212,12 +237,49 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         distortion=request.distortion,
     )
 
-    distorted_bbox = _build_bbox(
-        [point.distorted_image for point in projected_points], request.camera_intrinsics
+    undistorted_vertex_points, distorted_vertex_points = _project_vertices(
+        camera_vertices,
+        request.camera_intrinsics,
+        request.distortion,
     )
-    undistorted_bbox = _build_bbox(
-        [point.undistorted_image for point in projected_points], request.camera_intrinsics
-    )
+
+    if geometry.mesh_faces:
+        undistorted_mask = rasterize_visible_mask(
+            undistorted_vertex_points,
+            camera_vertices[:, 2],
+            geometry.mesh_faces,
+            image_width=request.camera_intrinsics.image_width,
+            image_height=request.camera_intrinsics.image_height,
+        )
+        distorted_mask = rasterize_visible_mask(
+            distorted_vertex_points,
+            camera_vertices[:, 2],
+            geometry.mesh_faces,
+            image_width=request.camera_intrinsics.image_width,
+            image_height=request.camera_intrinsics.image_height,
+        )
+        distorted_bbox = bbox_from_mask(distorted_mask)
+        undistorted_bbox = bbox_from_mask(undistorted_mask)
+        silhouette = SilhouetteSet(
+            distorted=contours_from_mask(distorted_mask),
+            undistorted=contours_from_mask(undistorted_mask),
+        )
+        coverage = coverage_ratio(distorted_mask)
+    else:
+        distorted_bbox = _build_bbox(
+            [point.distorted_image for point in projected_points], request.camera_intrinsics
+        )
+        undistorted_bbox = _build_bbox(
+            [point.undistorted_image for point in projected_points], request.camera_intrinsics
+        )
+        silhouette = SilhouetteSet(distorted=[], undistorted=[])
+        coverage = (
+            distorted_bbox.width * distorted_bbox.height
+            / float(request.camera_intrinsics.image_width * request.camera_intrinsics.image_height)
+            if distorted_bbox.width > 0.0 and distorted_bbox.height > 0.0
+            else 0.0
+        )
+
     distortion_offsets = [
         math.hypot(
             point.distorted_image.x - point.undistorted_image.x,
@@ -229,7 +291,7 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
     analysis = ProjectionAnalysis(
         pixel_width=distorted_bbox.width,
         pixel_height=distorted_bbox.height,
-        coverage_ratio=_coverage_ratio(distorted_bbox, request.camera_intrinsics),
+        coverage_ratio=coverage,
         distortion_mean_offset_px=float(np.mean(distortion_offsets)) if distortion_offsets else 0.0,
         distortion_max_offset_px=float(np.max(distortion_offsets)) if distortion_offsets else 0.0,
         visible_point_count=sum(point.visible for point in projected_points),
@@ -239,12 +301,15 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         bbox_inside_image=distorted_bbox.inside_image,
     )
     return ProjectionResult(
+        object_type=request.object_spec.type,
         projected_points=projected_points,
-        edges=edges,
-        faces=faces,
+        edges=geometry.debug_edges,
+        faces=geometry.debug_faces,
         center=center_point,
         bbox=distorted_bbox,
         undistorted_bbox=undistorted_bbox,
         principal_point=Point2D(x=request.camera_intrinsics.cx, y=request.camera_intrinsics.cy),
         analysis=analysis,
+        display_mesh=_mesh_to_display(world_vertices, geometry.mesh_faces),
+        silhouette=silhouette,
     )

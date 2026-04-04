@@ -5,8 +5,149 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import "./styles.css";
 
+const objectPose = {
+  x: 0,
+  y: 14,
+  z: 0,
+  yaw: 0,
+  pitch: 0,
+  roll: 0
+};
+
+const customDefaults = {
+  type: "custom_points",
+  pose: objectPose,
+  points: [
+    { id: "a", x: -1, y: -1, z: 0 },
+    { id: "b", x: 1, y: -1, z: 0 },
+    { id: "c", x: 1, y: 1, z: 0 },
+    { id: "d", x: -1, y: 1, z: 0 },
+    { id: "e", x: 0, y: 0, z: 2 }
+  ],
+  edges: [
+    { start_id: "a", end_id: "b" },
+    { start_id: "b", end_id: "c" },
+    { start_id: "c", end_id: "d" },
+    { start_id: "d", end_id: "a" },
+    { start_id: "a", end_id: "e" },
+    { start_id: "b", end_id: "e" },
+    { start_id: "c", end_id: "e" },
+    { start_id: "d", end_id: "e" }
+  ],
+  faces: []
+};
+
 const schemaPayload = {
-  object_types: ["box", "rectangle", "custom_points"],
+  object_types: [
+    {
+      type: "sedan",
+      label: "Sedan",
+      parameters: [
+        { name: "length", label: "length", group: "Body", min: 3.8, max: 5.8, step: 0.1 },
+        { name: "width", label: "width", group: "Body", min: 1.5, max: 2.2, step: 0.05 },
+        { name: "height", label: "height", group: "Body", min: 1.2, max: 2, step: 0.05 },
+        { name: "wheelbase", label: "wheelbase", group: "Body", min: 2.1, max: 3.6, step: 0.05 },
+        { name: "roof_height", label: "roof height", group: "Profile", min: 1, max: 1.8, step: 0.05 },
+        { name: "hood_length", label: "hood length", group: "Profile", min: 0.6, max: 1.6, step: 0.05 },
+        { name: "trunk_length", label: "trunk length", group: "Profile", min: 0.5, max: 1.6, step: 0.05 }
+      ],
+      defaults: {
+        type: "sedan",
+        length: 4.6,
+        width: 1.82,
+        height: 1.46,
+        wheelbase: 2.75,
+        roof_height: 1.34,
+        hood_length: 1.05,
+        trunk_length: 0.9,
+        pose: objectPose
+      }
+    },
+    {
+      type: "truck",
+      label: "Truck",
+      parameters: [
+        { name: "cab_length", label: "cab length", group: "Cab", min: 1.8, max: 3.2, step: 0.1 },
+        { name: "cargo_length", label: "cargo length", group: "Cargo", min: 3, max: 9, step: 0.1 },
+        { name: "cargo_width", label: "cargo width", group: "Cargo", min: 2, max: 3.2, step: 0.05 },
+        { name: "cargo_height", label: "cargo height", group: "Cargo", min: 2, max: 4.5, step: 0.05 },
+        { name: "cab_height", label: "cab height", group: "Cab", min: 1.8, max: 3.2, step: 0.05 },
+        { name: "wheelbase", label: "wheelbase", group: "Chassis", min: 3, max: 7, step: 0.1 }
+      ],
+      defaults: {
+        type: "truck",
+        cab_length: 2.3,
+        cargo_length: 5.6,
+        cargo_width: 2.45,
+        cargo_height: 2.85,
+        cab_height: 2.2,
+        wheelbase: 4.6,
+        pose: objectPose
+      }
+    },
+    {
+      type: "bicycle",
+      label: "Bicycle",
+      parameters: [
+        { name: "wheel_diameter", label: "wheel diameter", group: "Frame", min: 0.45, max: 0.9, step: 0.01 },
+        { name: "wheelbase", label: "wheelbase", group: "Frame", min: 0.9, max: 1.4, step: 0.01 },
+        { name: "frame_height", label: "frame height", group: "Frame", min: 0.45, max: 0.9, step: 0.01 },
+        { name: "handlebar_width", label: "handlebar width", group: "Cockpit", min: 0.32, max: 0.8, step: 0.01 },
+        { name: "saddle_height", label: "saddle height", group: "Cockpit", min: 0.55, max: 1.2, step: 0.01 }
+      ],
+      defaults: {
+        type: "bicycle",
+        wheel_diameter: 0.68,
+        wheelbase: 1.08,
+        frame_height: 0.62,
+        handlebar_width: 0.48,
+        saddle_height: 0.92,
+        pose: objectPose
+      }
+    },
+    {
+      type: "pedestrian",
+      label: "Pedestrian",
+      parameters: [
+        { name: "body_height", label: "body height", group: "Body", min: 1.4, max: 2.1, step: 0.01 },
+        { name: "shoulder_width", label: "shoulder width", group: "Body", min: 0.3, max: 0.7, step: 0.01 },
+        { name: "torso_depth", label: "torso depth", group: "Body", min: 0.15, max: 0.45, step: 0.01 },
+        { name: "hip_width", label: "hip width", group: "Body", min: 0.24, max: 0.55, step: 0.01 },
+        { name: "head_scale", label: "head scale", group: "Profile", min: 0.7, max: 1.4, step: 0.01 }
+      ],
+      defaults: {
+        type: "pedestrian",
+        body_height: 1.74,
+        shoulder_width: 0.46,
+        torso_depth: 0.24,
+        hip_width: 0.36,
+        head_scale: 1,
+        pose: objectPose
+      }
+    },
+    {
+      type: "traffic_cone",
+      label: "Traffic Cone",
+      parameters: [
+        { name: "base_diameter", label: "base diameter", group: "Cone", min: 0.2, max: 0.8, step: 0.01 },
+        { name: "top_diameter", label: "top diameter", group: "Cone", min: 0.03, max: 0.2, step: 0.01 },
+        { name: "cone_height", label: "cone height", group: "Cone", min: 0.2, max: 1.1, step: 0.01 }
+      ],
+      defaults: {
+        type: "traffic_cone",
+        base_diameter: 0.38,
+        top_diameter: 0.07,
+        cone_height: 0.72,
+        pose: objectPose
+      }
+    },
+    {
+      type: "custom_points",
+      label: "Custom Points",
+      parameters: [],
+      defaults: customDefaults
+    }
+  ],
   distortion_models: ["opencv", "fisheye"],
   defaults: {
     camera_intrinsics: {
@@ -37,18 +178,15 @@ const schemaPayload = {
       roll: 0
     },
     object_spec: {
-      type: "box",
-      width: 1.8,
-      length: 4.4,
-      height: 1.5,
-      pose: {
-        x: 0,
-        y: 14,
-        z: 0,
-        yaw: 0,
-        pitch: 0,
-        roll: 0
-      }
+      type: "sedan",
+      length: 4.6,
+      width: 1.82,
+      height: 1.46,
+      wheelbase: 2.75,
+      roof_height: 1.34,
+      hood_length: 1.05,
+      trunk_length: 0.9,
+      pose: objectPose
     },
     display_options: {
       show_frustum: true,
@@ -61,75 +199,152 @@ const schemaPayload = {
   }
 };
 
-const evaluationPayload = {
-  projected_points: [
-    {
-      point_id: "p0",
-      world: { x: -1, y: 12, z: 0 },
-      camera: { x: -1, y: 0.2, z: 12 },
-      undistorted_image: { x: 560, y: 376 },
-      distorted_image: { x: 561, y: 377 },
+function makeEvaluationPayload(objectType = "sedan") {
+  return {
+    object_type: objectType,
+    projected_points: [
+      {
+        point_id: "front_bumper_center",
+        world: { x: 0, y: 16.1, z: 0.72 },
+        camera: { x: 0, y: -0.38, z: 20.2 },
+        undistorted_image: { x: 640, y: 339 },
+        distorted_image: { x: 640, y: 340 },
+        visible: true,
+        inside_image: true,
+        inside_image_undistorted: true
+      },
+      {
+        point_id: "rear_bumper_center",
+        world: { x: 0, y: 11.9, z: 0.72 },
+        camera: { x: 0, y: -0.15, z: 16.1 },
+        undistorted_image: { x: 640, y: 353 },
+        distorted_image: { x: 640, y: 354 },
+        visible: true,
+        inside_image: true,
+        inside_image_undistorted: true
+      },
+      {
+        point_id: "roof_center",
+        world: { x: 0, y: 14, z: 1.35 },
+        camera: { x: 0, y: -0.88, z: 18.05 },
+        undistorted_image: { x: 640, y: 313 },
+        distorted_image: { x: 640, y: 314 },
+        visible: true,
+        inside_image: true,
+        inside_image_undistorted: true
+      },
+      {
+        point_id: "front_left_wheel_center",
+        world: { x: -0.72, y: 15.35, z: 0.33 },
+        camera: { x: -0.72, y: 0.05, z: 19.4 },
+        undistorted_image: { x: 604, y: 362 },
+        distorted_image: { x: 603, y: 363 },
+        visible: true,
+        inside_image: true,
+        inside_image_undistorted: true
+      },
+      {
+        point_id: "front_right_wheel_center",
+        world: { x: 0.72, y: 15.35, z: 0.33 },
+        camera: { x: 0.72, y: 0.05, z: 19.4 },
+        undistorted_image: { x: 676, y: 362 },
+        distorted_image: { x: 677, y: 363 },
+        visible: true,
+        inside_image: true,
+        inside_image_undistorted: true
+      }
+    ],
+    edges: [],
+    faces: [],
+    center: {
+      point_id: "object_center",
+      world: { x: 0, y: 14, z: 0.75 },
+      camera: { x: 0, y: -0.62, z: 18.01 },
+      undistorted_image: { x: 640, y: 325.83 },
+      distorted_image: { x: 640, y: 326.83 },
       visible: true,
       inside_image: true,
       inside_image_undistorted: true
     },
-    {
-      point_id: "p1",
-      world: { x: 1, y: 12, z: 0 },
-      camera: { x: 1, y: 0.2, z: 12 },
-      undistorted_image: { x: 720, y: 376 },
-      distorted_image: { x: 719, y: 377 },
-      visible: true,
+    bbox: {
+      min_x: 585,
+      max_x: 695,
+      min_y: 282,
+      max_y: 378,
+      width: 110,
+      height: 96,
       inside_image: true,
-      inside_image_undistorted: true
+      intersects_image: true
+    },
+    undistorted_bbox: {
+      min_x: 586,
+      max_x: 694,
+      min_y: 281,
+      max_y: 377,
+      width: 108,
+      height: 96,
+      inside_image: true,
+      intersects_image: true
+    },
+    principal_point: { x: 640, y: 360 },
+    analysis: {
+      pixel_width: 110,
+      pixel_height: 96,
+      coverage_ratio: 0.012,
+      distortion_mean_offset_px: 0.92,
+      distortion_max_offset_px: 1.31,
+      visible_point_count: 5,
+      hidden_point_count: 0,
+      center_inside_image: true,
+      bbox_intersects_image: true,
+      bbox_inside_image: true
+    },
+    display_mesh: {
+      vertices: [
+        { x: -0.9, y: 11.8, z: 0.28 },
+        { x: 0.9, y: 11.8, z: 0.28 },
+        { x: 0.9, y: 16.2, z: 0.28 },
+        { x: -0.9, y: 16.2, z: 0.28 },
+        { x: -0.72, y: 12.65, z: 1.32 },
+        { x: 0.72, y: 12.65, z: 1.32 },
+        { x: 0.72, y: 15.25, z: 1.32 },
+        { x: -0.72, y: 15.25, z: 1.32 }
+      ],
+      faces: [
+        { vertex_indices: [0, 1, 2], label: "body" },
+        { vertex_indices: [0, 2, 3], label: "body" },
+        { vertex_indices: [4, 5, 6], label: "roof" },
+        { vertex_indices: [4, 6, 7], label: "roof" },
+        { vertex_indices: [0, 1, 5], label: "side" },
+        { vertex_indices: [0, 5, 4], label: "side" }
+      ]
+    },
+    silhouette: {
+      distorted: [
+        {
+          points: [
+            { x: 592, y: 376 },
+            { x: 587, y: 312 },
+            { x: 640, y: 282 },
+            { x: 693, y: 312 },
+            { x: 688, y: 376 }
+          ]
+        }
+      ],
+      undistorted: [
+        {
+          points: [
+            { x: 593, y: 375 },
+            { x: 588, y: 311 },
+            { x: 640, y: 281 },
+            { x: 692, y: 311 },
+            { x: 687, y: 375 }
+          ]
+        }
+      ]
     }
-  ],
-  edges: [{ start_id: "p0", end_id: "p1" }],
-  faces: [],
-  center: {
-    point_id: "object_center",
-    world: { x: 0, y: 12, z: 0.75 },
-    camera: { x: 0, y: 0.1, z: 12 },
-    undistorted_image: { x: 640, y: 368 },
-    distorted_image: { x: 640, y: 369 },
-    visible: true,
-    inside_image: true,
-    inside_image_undistorted: true
-  },
-  bbox: {
-    min_x: 561,
-    max_x: 719,
-    min_y: 377,
-    max_y: 377,
-    width: 158,
-    height: 0,
-    inside_image: true,
-    intersects_image: true
-  },
-  undistorted_bbox: {
-    min_x: 560,
-    max_x: 720,
-    min_y: 376,
-    max_y: 376,
-    width: 160,
-    height: 0,
-    inside_image: true,
-    intersects_image: true
-  },
-  principal_point: { x: 640, y: 360 },
-  analysis: {
-    pixel_width: 158,
-    pixel_height: 0,
-    coverage_ratio: 0,
-    distortion_mean_offset_px: 1,
-    distortion_max_offset_px: 1,
-    visible_point_count: 2,
-    hidden_point_count: 0,
-    center_inside_image: true,
-    bbox_intersects_image: true,
-    bbox_inside_image: true
-  }
-};
+  };
+}
 
 function mockElementRect(
   element: Element,
@@ -169,7 +384,7 @@ describe("App", () => {
         value: MouseEvent
       });
     }
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/schema")) {
         return {
@@ -178,9 +393,10 @@ describe("App", () => {
         } as Response;
       }
       if (url.endsWith("/api/projection/evaluate")) {
+        const body = init?.body ? JSON.parse(String(init.body)) : null;
         return {
           ok: true,
-          json: async () => evaluationPayload
+          json: async () => makeEvaluationPayload(body?.object_spec?.type ?? "sedan")
         } as Response;
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -203,6 +419,20 @@ describe("App", () => {
     await user.click(screen.getByLabelText(/show bbox/i));
     await new Promise((resolve) => window.setTimeout(resolve, 250));
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders schema-driven object controls and switches parameter sets by object type", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await screen.findByLabelText(/hood length/i);
+    expect(screen.getByLabelText(/wheelbase/i)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/^type$/i), "bicycle");
+
+    await screen.findByLabelText(/wheel diameter/i);
+    expect(screen.queryByLabelText(/hood length/i)).not.toBeInTheDocument();
   });
 
   it("removes ground and distortion auxiliary views from the main workspace", async () => {
@@ -285,20 +515,20 @@ describe("App", () => {
     expect(workspaceStack).not.toHaveStyle({ alignItems: "start" });
   });
 
-  it("renders a grounded image-plane backdrop in the image projection view", async () => {
+  it("renders a full-width shallow ground plane and solid silhouettes in the image view", async () => {
     render(<App />);
 
     await screen.findByRole("heading", { name: /image projection view/i });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(document.querySelector(".ground-plane")).not.toBeNull()
-    );
-    expect(document.querySelector(".image-sensor-bg")).not.toBeNull();
+    await waitFor(() => expect(document.querySelector(".ground-plane")).not.toBeNull());
+    await waitFor(() => expect(document.querySelector(".object-silhouette-distorted")).not.toBeNull());
+    await waitFor(() => expect(document.querySelector(".object-silhouette-undistorted")).not.toBeNull());
+    expect(document.querySelector(".point-label")).toBeNull();
 
     const gradientStops = document.querySelectorAll("#imageGroundGradient stop");
     expect(gradientStops).toHaveLength(2);
-    expect(gradientStops[0]).toHaveAttribute("stop-color", "#d9e0e6");
-    expect(gradientStops[1]).toHaveAttribute("stop-color", "#bcc7cf");
+    expect(gradientStops[0]).toHaveAttribute("stop-color", "#e8ecef");
+    expect(gradientStops[1]).toHaveAttribute("stop-color", "#cfd7de");
   });
 
   it("renders the image viewport on a white matte with a more sky-like sensor backdrop", async () => {
@@ -315,9 +545,9 @@ describe("App", () => {
 
     const skyStops = document.querySelectorAll("#imageSkyGradient stop");
     expect(skyStops).toHaveLength(3);
-    expect(skyStops[0]).toHaveAttribute("stop-color", "#9ed0f6");
-    expect(skyStops[1]).toHaveAttribute("stop-color", "#dff0ff");
-    expect(skyStops[2]).toHaveAttribute("stop-color", "#f8fbff");
+    expect(skyStops[0]).toHaveAttribute("stop-color", "#8fc6f5");
+    expect(skyStops[1]).toHaveAttribute("stop-color", "#d8edff");
+    expect(skyStops[2]).toHaveAttribute("stop-color", "#f7fbff");
     expect(document.querySelector(".image-sky-glow")).not.toBeNull();
   });
 

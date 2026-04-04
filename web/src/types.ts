@@ -21,6 +21,11 @@ const faceSchema = z.object({
   label: z.string().nullable().optional()
 });
 
+const meshFaceSchema = z.object({
+  vertex_indices: z.tuple([z.number().int(), z.number().int(), z.number().int()]),
+  label: z.string().nullable().optional()
+});
+
 const pose3DSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -60,18 +65,54 @@ const displayOptionsSchema = z.object({
   show_axes: z.boolean()
 });
 
-const boxSpecSchema = z.object({
-  type: z.literal("box"),
-  width: z.number(),
+const sedanSpecSchema = z.object({
+  type: z.literal("sedan"),
   length: z.number(),
+  width: z.number(),
   height: z.number(),
+  wheelbase: z.number(),
+  roof_height: z.number(),
+  hood_length: z.number(),
+  trunk_length: z.number(),
   pose: pose3DSchema
 });
 
-const rectangleSpecSchema = z.object({
-  type: z.literal("rectangle"),
-  width: z.number(),
-  length: z.number(),
+const truckSpecSchema = z.object({
+  type: z.literal("truck"),
+  cab_length: z.number(),
+  cargo_length: z.number(),
+  cargo_width: z.number(),
+  cargo_height: z.number(),
+  cab_height: z.number(),
+  wheelbase: z.number(),
+  pose: pose3DSchema
+});
+
+const bicycleSpecSchema = z.object({
+  type: z.literal("bicycle"),
+  wheel_diameter: z.number(),
+  wheelbase: z.number(),
+  frame_height: z.number(),
+  handlebar_width: z.number(),
+  saddle_height: z.number(),
+  pose: pose3DSchema
+});
+
+const pedestrianSpecSchema = z.object({
+  type: z.literal("pedestrian"),
+  body_height: z.number(),
+  shoulder_width: z.number(),
+  torso_depth: z.number(),
+  hip_width: z.number(),
+  head_scale: z.number(),
+  pose: pose3DSchema
+});
+
+const trafficConeSpecSchema = z.object({
+  type: z.literal("traffic_cone"),
+  base_diameter: z.number(),
+  top_diameter: z.number(),
+  cone_height: z.number(),
   pose: pose3DSchema
 });
 
@@ -88,8 +129,11 @@ const customPointSpecSchema = z.object({
 });
 
 const objectSpecSchema = z.discriminatedUnion("type", [
-  boxSpecSchema,
-  rectangleSpecSchema,
+  sedanSpecSchema,
+  truckSpecSchema,
+  bicycleSpecSchema,
+  pedestrianSpecSchema,
+  trafficConeSpecSchema,
   customPointSpecSchema
 ]);
 
@@ -128,6 +172,36 @@ const projectionAnalysisSchema = z.object({
   bbox_inside_image: z.boolean()
 });
 
+const contour2DSchema = z.object({
+  points: z.array(point2DSchema)
+});
+
+const silhouetteSetSchema = z.object({
+  distorted: z.array(contour2DSchema),
+  undistorted: z.array(contour2DSchema)
+});
+
+const displayMeshSchema = z.object({
+  vertices: z.array(vector3Schema),
+  faces: z.array(meshFaceSchema)
+});
+
+const objectParameterDefinitionSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  group: z.string(),
+  min: z.number(),
+  max: z.number(),
+  step: z.number()
+});
+
+const objectTypeDefinitionSchema = z.object({
+  type: z.string(),
+  label: z.string(),
+  parameters: z.array(objectParameterDefinitionSchema),
+  defaults: objectSpecSchema
+});
+
 export const projectionRequestSchema = z.object({
   camera_intrinsics: cameraIntrinsicsSchema,
   distortion: distortionModelSchema,
@@ -137,6 +211,7 @@ export const projectionRequestSchema = z.object({
 });
 
 export const projectionResultSchema = z.object({
+  object_type: z.string(),
   projected_points: z.array(pointDiagnosticSchema),
   edges: z.array(edgeSchema),
   faces: z.array(faceSchema),
@@ -144,11 +219,13 @@ export const projectionResultSchema = z.object({
   bbox: boundingBoxSchema,
   undistorted_bbox: boundingBoxSchema,
   principal_point: point2DSchema,
-  analysis: projectionAnalysisSchema
+  analysis: projectionAnalysisSchema,
+  display_mesh: displayMeshSchema,
+  silhouette: silhouetteSetSchema
 });
 
 export const projectionSchemaSchema = z.object({
-  object_types: z.array(z.string()),
+  object_types: z.array(objectTypeDefinitionSchema),
   distortion_models: z.array(z.string()),
   defaults: projectionRequestSchema
 });
@@ -163,18 +240,28 @@ export type Point2D = z.infer<typeof point2DSchema>;
 export type Vector3 = z.infer<typeof vector3Schema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type Face = z.infer<typeof faceSchema>;
+export type MeshFace = z.infer<typeof meshFaceSchema>;
 export type Pose3D = z.infer<typeof pose3DSchema>;
 export type CameraIntrinsics = z.infer<typeof cameraIntrinsicsSchema>;
 export type DistortionModel = z.infer<typeof distortionModelSchema>;
 export type DisplayOptions = z.infer<typeof displayOptionsSchema>;
-export type BoxSpec = z.infer<typeof boxSpecSchema>;
-export type RectangleSpec = z.infer<typeof rectangleSpecSchema>;
+export type SedanSpec = z.infer<typeof sedanSpecSchema>;
+export type TruckSpec = z.infer<typeof truckSpecSchema>;
+export type BicycleSpec = z.infer<typeof bicycleSpecSchema>;
+export type PedestrianSpec = z.infer<typeof pedestrianSpecSchema>;
+export type TrafficConeSpec = z.infer<typeof trafficConeSpecSchema>;
 export type CustomPointSpec = z.infer<typeof customPointSpecSchema>;
 export type ObjectSpec = z.infer<typeof objectSpecSchema>;
 export type PointDiagnostic = z.infer<typeof pointDiagnosticSchema>;
 export type BoundingBox = z.infer<typeof boundingBoxSchema>;
 export type ProjectionAnalysis = z.infer<typeof projectionAnalysisSchema>;
+export type Contour2D = z.infer<typeof contour2DSchema>;
+export type SilhouetteSet = z.infer<typeof silhouetteSetSchema>;
+export type DisplayMesh = z.infer<typeof displayMeshSchema>;
+export type ObjectParameterDefinition = z.infer<typeof objectParameterDefinitionSchema>;
+export type ObjectTypeDefinition = z.infer<typeof objectTypeDefinitionSchema>;
 export type ProjectionRequest = z.infer<typeof projectionRequestSchema>;
 export type ProjectionResult = z.infer<typeof projectionResultSchema>;
 export type ProjectionSchema = z.infer<typeof projectionSchemaSchema>;
 export type CustomObjectDefinition = z.infer<typeof customDefinitionSchema>;
+export type ParameterizedObjectSpec = Exclude<ObjectSpec, CustomPointSpec>;

@@ -1,8 +1,13 @@
-import { useEffect, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type JSX } from "react";
 
 import { NumericField } from "./NumericField";
 import { useAppStore } from "../store/useAppStore";
-import { type CustomObjectDefinition } from "../types";
+import {
+  type CustomObjectDefinition,
+  type ObjectParameterDefinition,
+  type ObjectSpec,
+  type ObjectTypeDefinition
+} from "../types";
 
 function CustomPointsEditor(): JSX.Element | null {
   const objectSpec = useAppStore((state) => state.request?.object_spec);
@@ -76,6 +81,32 @@ function OverlayInput(): JSX.Element {
   );
 }
 
+function getObjectDefinition(
+  definitions: ObjectTypeDefinition[],
+  type: ObjectSpec["type"]
+): ObjectTypeDefinition | null {
+  return definitions.find((definition) => definition.type === type) ?? null;
+}
+
+function groupParameters(parameters: ObjectParameterDefinition[]): Array<[string, ObjectParameterDefinition[]]> {
+  const grouped = new Map<string, ObjectParameterDefinition[]>();
+  parameters.forEach((parameter) => {
+    const existing = grouped.get(parameter.group);
+    if (existing) {
+      existing.push(parameter);
+      return;
+    }
+    grouped.set(parameter.group, [parameter]);
+  });
+  return Array.from(grouped.entries());
+}
+
+function isParameterizedObject(
+  objectSpec: ObjectSpec
+): objectSpec is Exclude<ObjectSpec, { type: "custom_points" }> {
+  return objectSpec.type !== "custom_points";
+}
+
 interface ParameterPanelProps {
   style?: CSSProperties;
 }
@@ -88,9 +119,19 @@ export function ParameterPanel({ style }: ParameterPanelProps): JSX.Element | nu
   const setDistortionModel = useAppStore((state) => state.setDistortionModel);
   const setCameraPoseValue = useAppStore((state) => state.setCameraPoseValue);
   const setObjectPoseValue = useAppStore((state) => state.setObjectPoseValue);
-  const setObjectDimension = useAppStore((state) => state.setObjectDimension);
+  const setObjectParameter = useAppStore((state) => state.setObjectParameter);
   const setObjectType = useAppStore((state) => state.setObjectType);
   const setDisplayOption = useAppStore((state) => state.setDisplayOption);
+
+  const activeObjectDefinition = useMemo(
+    () =>
+      request && schema ? getObjectDefinition(schema.object_types, request.object_spec.type) : null,
+    [request, schema]
+  );
+  const groupedObjectParameters = useMemo(
+    () => groupParameters(activeObjectDefinition?.parameters ?? []),
+    [activeObjectDefinition]
+  );
 
   if (!request || !schema) {
     return null;
@@ -110,12 +151,14 @@ export function ParameterPanel({ style }: ParameterPanelProps): JSX.Element | nu
             value={request.camera_intrinsics.image_width}
             onCommit={(value) => setCameraIntrinsic("image_width", value)}
             step={1}
+            min={1}
           />
           <NumericField
             label="image height"
             value={request.camera_intrinsics.image_height}
             onCommit={(value) => setCameraIntrinsic("image_height", value)}
             step={1}
+            min={1}
           />
         </div>
       </details>
@@ -165,53 +208,65 @@ export function ParameterPanel({ style }: ParameterPanelProps): JSX.Element | nu
 
       <details open className="panel-group">
         <summary><h2>Object</h2></summary>
-        <div className="field-grid">
+        <div className="field-grid object-type-row">
           <label className="field">
             <span>Type</span>
             <select
               aria-label="Type"
               value={request.object_spec.type}
-              onChange={(event) =>
-                setObjectType(event.target.value as "box" | "rectangle" | "custom_points")
-              }
+              onChange={(event) => setObjectType(event.target.value as ObjectSpec["type"])}
             >
               {schema.object_types.map((objectType) => (
-                <option key={objectType} value={objectType}>
-                  {objectType}
+                <option key={objectType.type} value={objectType.type}>
+                  {objectType.label}
                 </option>
               ))}
             </select>
           </label>
-          {request.object_spec.type !== "custom_points" && (
-            <>
-              <NumericField
-                label="width"
-                value={request.object_spec.width}
-                onCommit={(value) => setObjectDimension("width", value)}
-              />
-              <NumericField
-                label="length"
-                value={request.object_spec.length}
-                onCommit={(value) => setObjectDimension("length", value)}
-              />
-              {"height" in request.object_spec && (
-                <NumericField
-                  label="height"
-                  value={request.object_spec.height}
-                  onCommit={(value) => setObjectDimension("height", value)}
-                />
-              )}
-            </>
-          )}
-          {(["x", "y", "z", "yaw", "pitch", "roll"] as const).map((key) => (
-            <NumericField
-              key={key}
-              label={`object ${key}`}
-              value={request.object_spec.pose[key]}
-              onCommit={(value) => setObjectPoseValue(key, value)}
-            />
-          ))}
+          {activeObjectDefinition ? (
+            <div className="object-type-chip" aria-label="Object definition">
+              {activeObjectDefinition.label}
+            </div>
+          ) : null}
         </div>
+        {isParameterizedObject(request.object_spec) &&
+          groupedObjectParameters.map(([groupName, parameters]) => (
+            <section key={groupName} className="parameter-subsection">
+              <p className="parameter-subsection-title">{groupName}</p>
+              <div className="field-grid">
+                {parameters.map((parameter) => {
+                  const parameterValue = (request.object_spec as Record<string, unknown>)[parameter.name];
+                  if (typeof parameterValue !== "number") {
+                    return null;
+                  }
+                  return (
+                    <NumericField
+                      key={parameter.name}
+                      label={parameter.label}
+                      value={parameterValue}
+                      onCommit={(value) => setObjectParameter(parameter.name, value)}
+                      step={parameter.step}
+                      min={parameter.min}
+                      max={parameter.max}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        <section className="parameter-subsection">
+          <p className="parameter-subsection-title">Pose</p>
+          <div className="field-grid">
+            {(["x", "y", "z", "yaw", "pitch", "roll"] as const).map((key) => (
+              <NumericField
+                key={key}
+                label={`object ${key}`}
+                value={request.object_spec.pose[key]}
+                onCommit={(value) => setObjectPoseValue(key, value)}
+              />
+            ))}
+          </div>
+        </section>
         <CustomPointsEditor />
       </details>
 
