@@ -169,7 +169,7 @@ const schemaPayload = {
       defaults: customDefaults
     }
   ],
-  distortion_models: ["opencv", "fisheye"],
+  distortion_models: ["radtan", "fisheye"],
   defaults: {
     camera_intrinsics: {
       fx: 1567.36,
@@ -180,7 +180,7 @@ const schemaPayload = {
       image_height: 1080
     },
     distortion: {
-      model: "opencv",
+      model: "radtan",
       k1: -0.31,
       k2: 0.08,
       p1: 0,
@@ -212,8 +212,6 @@ const schemaPayload = {
     display_options: {
       show_frustum: true,
       show_bbox: true,
-      show_distorted: true,
-      show_undistorted: true,
       show_labels: true,
       show_axes: true
     }
@@ -288,11 +286,11 @@ function makeEvaluationPayload(objectType = "sedan") {
       inside_image_undistorted: true
     },
     bbox: {
-      min_x: 585,
-      max_x: 695,
-      min_y: 282,
-      max_y: 378,
-      width: 110,
+      min_x: 586,
+      max_x: 694,
+      min_y: 281,
+      max_y: 377,
+      width: 108,
       height: 96,
       inside_image: true,
       intersects_image: true
@@ -309,7 +307,7 @@ function makeEvaluationPayload(objectType = "sedan") {
     },
     principal_point: { x: 640, y: 360 },
     analysis: {
-      pixel_width: 110,
+      pixel_width: 108,
       pixel_height: 96,
       coverage_ratio: 0.012,
       distortion_mean_offset_px: 0.92,
@@ -449,6 +447,18 @@ describe("App", () => {
     await user.click(screen.getByLabelText(/show bbox/i));
     await new Promise((resolve) => window.setTimeout(resolve, 250));
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByLabelText(/show distorted/i)).toBeNull();
+    expect(screen.queryByLabelText(/show undistorted/i)).toBeNull();
+  });
+
+  it("shows the renamed distortion model labels", async () => {
+    render(<App />);
+
+    await screen.findByLabelText(/model/i);
+
+    expect(screen.getByRole("option", { name: "Standard (RadTan)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Fisheye" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "opencv" })).toBeNull();
   });
 
   it("restores persisted request, layout, and overlay, then recomputes from restored inputs", async () => {
@@ -651,8 +661,8 @@ describe("App", () => {
     await screen.findByRole("heading", { name: /image projection view/i });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(document.querySelector(".ground-plane")).not.toBeNull());
-    await waitFor(() => expect(document.querySelector(".object-silhouette-distorted")).not.toBeNull());
     await waitFor(() => expect(document.querySelector(".object-silhouette-undistorted")).not.toBeNull());
+    expect(document.querySelector(".object-silhouette-distorted")).toBeNull();
     expect(document.querySelector(".point-label")).toBeNull();
 
     const gradientStops = document.querySelectorAll("#imageGroundGradient stop");

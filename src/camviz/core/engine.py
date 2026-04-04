@@ -258,25 +258,21 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
             image_width=request.camera_intrinsics.image_width,
             image_height=request.camera_intrinsics.image_height,
         )
-        distorted_bbox = bbox_from_mask(distorted_mask)
         undistorted_bbox = bbox_from_mask(undistorted_mask)
         silhouette = SilhouetteSet(
             distorted=contours_from_mask(distorted_mask),
             undistorted=contours_from_mask(undistorted_mask),
         )
-        coverage = coverage_ratio(distorted_mask)
+        coverage = coverage_ratio(undistorted_mask)
     else:
-        distorted_bbox = _build_bbox(
-            [point.distorted_image for point in projected_points], request.camera_intrinsics
-        )
         undistorted_bbox = _build_bbox(
             [point.undistorted_image for point in projected_points], request.camera_intrinsics
         )
         silhouette = SilhouetteSet(distorted=[], undistorted=[])
         coverage = (
-            distorted_bbox.width * distorted_bbox.height
+            undistorted_bbox.width * undistorted_bbox.height
             / float(request.camera_intrinsics.image_width * request.camera_intrinsics.image_height)
-            if distorted_bbox.width > 0.0 and distorted_bbox.height > 0.0
+            if undistorted_bbox.width > 0.0 and undistorted_bbox.height > 0.0
             else 0.0
         )
 
@@ -289,16 +285,16 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         if point.distorted_image is not None and point.undistorted_image is not None
     ]
     analysis = ProjectionAnalysis(
-        pixel_width=distorted_bbox.width,
-        pixel_height=distorted_bbox.height,
+        pixel_width=undistorted_bbox.width,
+        pixel_height=undistorted_bbox.height,
         coverage_ratio=coverage,
         distortion_mean_offset_px=float(np.mean(distortion_offsets)) if distortion_offsets else 0.0,
         distortion_max_offset_px=float(np.max(distortion_offsets)) if distortion_offsets else 0.0,
         visible_point_count=sum(point.visible for point in projected_points),
         hidden_point_count=sum(not point.visible for point in projected_points),
-        center_inside_image=center_point.inside_image,
-        bbox_intersects_image=distorted_bbox.intersects_image,
-        bbox_inside_image=distorted_bbox.inside_image,
+        center_inside_image=center_point.inside_image_undistorted,
+        bbox_intersects_image=undistorted_bbox.intersects_image,
+        bbox_inside_image=undistorted_bbox.inside_image,
     )
     return ProjectionResult(
         object_type=request.object_spec.type,
@@ -306,7 +302,7 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         edges=geometry.debug_edges,
         faces=geometry.debug_faces,
         center=center_point,
-        bbox=distorted_bbox,
+        bbox=undistorted_bbox,
         undistorted_bbox=undistorted_bbox,
         principal_point=Point2D(x=request.camera_intrinsics.cx, y=request.camera_intrinsics.cy),
         analysis=analysis,

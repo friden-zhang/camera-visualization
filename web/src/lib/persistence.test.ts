@@ -86,7 +86,7 @@ const schema: ProjectionSchema = {
       }
     }
   ],
-  distortion_models: ["opencv", "fisheye"],
+  distortion_models: ["radtan", "fisheye"],
   defaults: {
     camera_intrinsics: {
       fx: 1567.36,
@@ -97,7 +97,7 @@ const schema: ProjectionSchema = {
       image_height: 1080
     },
     distortion: {
-      model: "opencv",
+      model: "radtan",
       k1: -0.31,
       k2: 0.08,
       p1: 0,
@@ -129,8 +129,6 @@ const schema: ProjectionSchema = {
     display_options: {
       show_frustum: true,
       show_bbox: true,
-      show_distorted: true,
-      show_undistorted: true,
       show_labels: true,
       show_axes: true
     }
@@ -289,6 +287,17 @@ describe("persistence", () => {
     expect(restored?.object_spec.pose.x).toBe(1.2);
     expect(restored?.display_options.show_bbox).toBe(false);
     expect(restored?.display_options.show_axes).toBe(true);
+  });
+
+  it("maps the legacy opencv model name to radtan when restoring persisted state", () => {
+    const restored = resolvePersistedRequest(schema, {
+      distortion: {
+        model: "opencv"
+      }
+    });
+
+    expect(restored).not.toBeNull();
+    expect(restored?.distortion.model).toBe("radtan");
   });
 
   it("persists the request in localStorage and the overlay image in IndexedDB", async () => {

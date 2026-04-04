@@ -36,7 +36,7 @@ def build_default_request() -> ProjectionRequest:
             image_height=1080,
         ),
         distortion=DistortionModel(
-            model="opencv",
+            model="radtan",
             k1=round_default(-0.310387649487),
             k2=round_default(0.076313217331),
             p1=round_default(-0.000111535757),
@@ -55,7 +55,7 @@ def build_default_request() -> ProjectionRequest:
 def build_schema() -> ProjectionSchema:
     return ProjectionSchema(
         object_types=build_object_type_definitions(),
-        distortion_models=["opencv", "fisheye"],
+        distortion_models=["radtan", "fisheye"],
         defaults=build_default_request(),
     )
 

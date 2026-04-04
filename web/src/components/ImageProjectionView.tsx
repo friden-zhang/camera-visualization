@@ -21,14 +21,8 @@ const SILHOUETTE_CLASS_BY_TYPE: Record<string, string> = {
 function imagePointForDisplay(point: {
   distorted_image: Point2D | null;
   undistorted_image: Point2D | null;
-}, request: ProjectionRequest): Point2D | null {
-  if (request.display_options.show_distorted) {
-    return point.distorted_image;
-  }
-  if (request.display_options.show_undistorted) {
-    return point.undistorted_image;
-  }
-  return point.distorted_image ?? point.undistorted_image;
+}): Point2D | null {
+  return point.undistorted_image ?? point.distorted_image;
 }
 
 function contourPoints(contour: Contour2D): string | null {
@@ -86,26 +80,25 @@ export function ImageProjectionView({
     : SILHOUETTE_CLASS_BY_TYPE.custom_points;
   const groundPlanePoints = useMemo(() => {
     const points = groundProjectionSurface
-      .map((corner) => imagePointForDisplay(corner, request))
+      .map((corner) => imagePointForDisplay(corner))
       .filter((point): point is Point2D => point !== null);
     return points.length === 4 ? points.map((point) => `${point.x},${point.y}`).join(" ") : null;
-  }, [groundProjectionSurface, request]);
+  }, [groundProjectionSurface]);
   const farGroundEdge = useMemo(() => {
     const farLeft = groundProjectionSurface[0];
     const farRight = groundProjectionSurface[1];
     if (!farLeft || !farRight) {
       return null;
     }
-    const start = imagePointForDisplay(farLeft, request);
-    const end = imagePointForDisplay(farRight, request);
+    const start = imagePointForDisplay(farLeft);
+    const end = imagePointForDisplay(farRight);
     return start && end ? { start, end } : null;
-  }, [groundProjectionSurface, request]);
-  const distortedContours = projection?.silhouette.distorted ?? [];
+  }, [groundProjectionSurface]);
   const undistortedContours = projection?.silhouette.undistorted ?? [];
-  const centerPoint = projection ? imagePointForDisplay(projection.center, request) : null;
+  const centerPoint = projection ? imagePointForDisplay(projection.center) : null;
   const shouldRenderDebugEdges =
     projection?.object_type === "custom_points" ||
-    (distortedContours.length === 0 && undistortedContours.length === 0);
+    undistortedContours.length === 0;
 
   return (
     <section className="view-card image-view-card">
@@ -184,8 +177,7 @@ export function ImageProjectionView({
           )}
           {groundProjectionSegments.map((segment) => (
             <g key={`ground-edge-${segment.start_id}-${segment.end_id}`}>
-              {request.display_options.show_undistorted &&
-                segment.start.undistorted_image &&
+              {segment.start.undistorted_image &&
                 segment.end.undistorted_image && (
                   <line
                     x1={segment.start.undistorted_image.x}
@@ -195,41 +187,18 @@ export function ImageProjectionView({
                     className="ground-edge-line ground-edge-line-undistorted"
                   />
                 )}
-              {request.display_options.show_distorted &&
-                segment.start.distorted_image &&
-                segment.end.distorted_image && (
-                  <line
-                    x1={segment.start.distorted_image.x}
-                    y1={segment.start.distorted_image.y}
-                    x2={segment.end.distorted_image.x}
-                    y2={segment.end.distorted_image.y}
-                    className="ground-edge-line ground-edge-line-distorted"
-                  />
-                )}
             </g>
           ))}
-          {request.display_options.show_undistorted &&
-            undistortedContours.map((contour, index) => {
-              const points = contourPoints(contour);
-              return points ? (
-                <polygon
-                  key={`undistorted-silhouette-${index}`}
-                  points={points}
-                  className={`object-silhouette object-silhouette-undistorted ${silhouetteClass}`}
-                />
-              ) : null;
-            })}
-          {request.display_options.show_distorted &&
-            distortedContours.map((contour, index) => {
-              const points = contourPoints(contour);
-              return points ? (
-                <polygon
-                  key={`distorted-silhouette-${index}`}
-                  points={points}
-                  className={`object-silhouette object-silhouette-distorted ${silhouetteClass}`}
-                />
-              ) : null;
-            })}
+          {undistortedContours.map((contour, index) => {
+            const points = contourPoints(contour);
+            return points ? (
+              <polygon
+                key={`undistorted-silhouette-${index}`}
+                points={points}
+                className={`object-silhouette object-silhouette-undistorted ${silhouetteClass}`}
+              />
+            ) : null;
+          })}
           {request.display_options.show_bbox && projection && (
             <rect
               x={projection.bbox.min_x}
@@ -249,12 +218,8 @@ export function ImageProjectionView({
             projection?.edges.map((edge) => {
               const start = projection.projected_points.find((point) => point.point_id === edge.start_id);
               const end = projection.projected_points.find((point) => point.point_id === edge.end_id);
-              const startImage = request.display_options.show_distorted
-                ? start?.distorted_image
-                : start?.undistorted_image;
-              const endImage = request.display_options.show_distorted
-                ? end?.distorted_image
-                : end?.undistorted_image;
+              const startImage = start?.undistorted_image;
+              const endImage = end?.undistorted_image;
               if (!startImage || !endImage) {
                 return null;
               }
@@ -271,22 +236,13 @@ export function ImageProjectionView({
             })}
           {projection?.projected_points.map((point) => (
             <g key={point.point_id}>
-              {request.display_options.show_undistorted &&
-                renderPoint(
-                  point.undistorted_image,
-                  point.point_id,
-                  point.point_id === activeId ? "image-point point-active-undistorted" : "image-point point-undistorted",
-                  setHoveredPointId,
-                  setSelectedPointId
-                )}
-              {request.display_options.show_distorted &&
-                renderPoint(
-                  point.distorted_image,
-                  point.point_id,
-                  point.point_id === activeId ? "image-point point-active" : "image-point point-distorted",
-                  setHoveredPointId,
-                  setSelectedPointId
-                )}
+              {renderPoint(
+                point.undistorted_image,
+                point.point_id,
+                point.point_id === activeId ? "image-point point-active-undistorted" : "image-point point-undistorted",
+                setHoveredPointId,
+                setSelectedPointId
+              )}
             </g>
           ))}
           {centerPoint && (

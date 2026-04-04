@@ -45,7 +45,7 @@ const cameraIntrinsicsSchema = z.object({
 });
 
 const distortionModelSchema = z.object({
-  model: z.enum(["opencv", "fisheye"]),
+  model: z.enum(["radtan", "fisheye"]),
   k1: z.number(),
   k2: z.number(),
   p1: z.number(),
@@ -59,8 +59,6 @@ const distortionModelSchema = z.object({
 const displayOptionsSchema = z.object({
   show_frustum: z.boolean(),
   show_bbox: z.boolean(),
-  show_distorted: z.boolean(),
-  show_undistorted: z.boolean(),
   show_labels: z.boolean(),
   show_axes: z.boolean()
 });

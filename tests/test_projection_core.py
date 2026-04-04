@@ -30,7 +30,7 @@ def build_request(object_spec: object) -> ProjectionRequest:
             image_height=720,
         ),
         distortion=DistortionModel(
-            model="opencv",
+            model="radtan",
             k1=0.11,
             k2=-0.03,
             p1=0.001,

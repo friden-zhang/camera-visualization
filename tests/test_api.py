@@ -16,7 +16,7 @@ def build_payload() -> dict[str, object]:
             "image_height": 720,
         },
         "distortion": {
-            "model": "opencv",
+            "model": "radtan",
             "k1": 0.1,
             "k2": -0.02,
             "p1": 0.001,
@@ -38,8 +38,6 @@ def build_payload() -> dict[str, object]:
         "display_options": {
             "show_frustum": True,
             "show_bbox": True,
-            "show_distorted": True,
-            "show_undistorted": True,
             "show_labels": True,
             "show_axes": True,
         },
@@ -71,7 +69,7 @@ def test_schema_endpoint_exposes_supported_object_definitions_and_defaults() -> 
         "image_height": 1080,
     }
     assert payload["defaults"]["distortion"] == {
-        "model": "opencv",
+        "model": "radtan",
         "k1": -0.31,
         "k2": 0.08,
         "p1": 0.0,
@@ -83,7 +81,7 @@ def test_schema_endpoint_exposes_supported_object_definitions_and_defaults() -> 
     }
     sedan = next(item for item in payload["object_types"] if item["type"] == "sedan")
     assert any(parameter["name"] == "wheelbase" for parameter in sedan["parameters"])
-    assert payload["distortion_models"] == ["opencv", "fisheye"]
+    assert payload["distortion_models"] == ["radtan", "fisheye"]
 
 
 def test_evaluate_projection_returns_landmarks_mesh_silhouette_and_analysis() -> None:
@@ -100,7 +98,20 @@ def test_evaluate_projection_returns_landmarks_mesh_silhouette_and_analysis() ->
     assert len(payload["silhouette"]["distorted"]) > 0
     assert payload["bbox"]["width"] > 0.0
     assert payload["analysis"]["coverage_ratio"] > 0.0
+    assert payload["bbox"] == payload["undistorted_bbox"]
+    assert payload["analysis"]["pixel_width"] == payload["undistorted_bbox"]["width"]
+    assert payload["analysis"]["pixel_height"] == payload["undistorted_bbox"]["height"]
     assert payload["center"]["point_id"] == "object_center"
+
+
+def test_legacy_opencv_distortion_alias_is_still_accepted() -> None:
+    client = TestClient(build_app())
+    payload = build_payload()
+    payload["distortion"]["model"] = "opencv"
+
+    response = client.post("/api/projection/evaluate", json=payload)
+
+    assert response.status_code == 200
 
 
 def test_invalid_custom_point_topology_returns_validation_error() -> None:

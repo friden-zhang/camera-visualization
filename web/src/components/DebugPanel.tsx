@@ -36,7 +36,7 @@ export function DebugPanel({ projection }: DebugPanelProps): JSX.Element {
                 <div><dt>ID</dt><dd>{selectedPoint.point_id}</dd></div>
                 <div><dt>World</dt><dd>{selectedPoint.world.x.toFixed(2)}, {selectedPoint.world.y.toFixed(2)}, {selectedPoint.world.z.toFixed(2)}</dd></div>
                 <div><dt>Camera</dt><dd>{selectedPoint.camera.x.toFixed(2)}, {selectedPoint.camera.y.toFixed(2)}, {selectedPoint.camera.z.toFixed(2)}</dd></div>
-                <div><dt>Image</dt><dd>{selectedPoint.distorted_image ? `${selectedPoint.distorted_image.x.toFixed(2)}, ${selectedPoint.distorted_image.y.toFixed(2)}` : selectedPoint.undistorted_image ? `${selectedPoint.undistorted_image.x.toFixed(2)}, ${selectedPoint.undistorted_image.y.toFixed(2)}` : "n/a"}</dd></div>
+                <div><dt>Image</dt><dd>{selectedPoint.undistorted_image ? `${selectedPoint.undistorted_image.x.toFixed(2)}, ${selectedPoint.undistorted_image.y.toFixed(2)}` : selectedPoint.distorted_image ? `${selectedPoint.distorted_image.x.toFixed(2)}, ${selectedPoint.distorted_image.y.toFixed(2)}` : "n/a"}</dd></div>
               </dl>
             ) : (
               <p>No point selected.</p>
@@ -49,7 +49,6 @@ export function DebugPanel({ projection }: DebugPanelProps): JSX.Element {
               <div><dt>Pixel height</dt><dd>{projection.analysis.pixel_height.toFixed(2)}</dd></div>
               <div><dt>Coverage</dt><dd>{(projection.analysis.coverage_ratio * 100).toFixed(2)}%</dd></div>
               <div><dt>Visible points</dt><dd>{projection.analysis.visible_point_count}</dd></div>
-              <div><dt>Distortion mean</dt><dd>{projection.analysis.distortion_mean_offset_px.toFixed(2)} px</dd></div>
             </dl>
           </div>
           <div>

@@ -54,7 +54,7 @@ class CameraIntrinsics(BaseModel):
 
 
 class DistortionModel(BaseModel):
-    model: Literal["opencv", "fisheye"] = "opencv"
+    model: Literal["radtan", "fisheye"] = "radtan"
     k1: float = 0.0
     k2: float = 0.0
     p1: float = 0.0
@@ -64,12 +64,20 @@ class DistortionModel(BaseModel):
     k5: float = 0.0
     k6: float = 0.0
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_model_name(cls, value: object) -> object:
+        if isinstance(value, dict) and value.get("model") == "opencv":
+            return {
+                **value,
+                "model": "radtan",
+            }
+        return value
+
 
 class DisplayOptions(BaseModel):
     show_frustum: bool = True
     show_bbox: bool = True
-    show_distorted: bool = True
-    show_undistorted: bool = True
     show_labels: bool = True
     show_axes: bool = True
 
@@ -274,4 +282,3 @@ class ProjectionSchema(BaseModel):
     object_types: list[ObjectTypeDefinition]
     distortion_models: list[str]
     defaults: ProjectionRequest
-

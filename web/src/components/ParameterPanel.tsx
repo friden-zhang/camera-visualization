@@ -4,10 +4,16 @@ import { NumericField } from "./NumericField";
 import { useAppStore } from "../store/useAppStore";
 import {
   type CustomObjectDefinition,
+  type DistortionModel,
   type ObjectParameterDefinition,
   type ObjectSpec,
   type ObjectTypeDefinition
 } from "../types";
+
+const DISTORTION_MODEL_LABELS: Record<DistortionModel["model"], string> = {
+  radtan: "Standard (RadTan)",
+  fisheye: "Fisheye"
+};
 
 function CustomPointsEditor(): JSX.Element | null {
   const objectSpec = useAppStore((state) => state.request?.object_spec);
@@ -171,11 +177,11 @@ export function ParameterPanel({ style }: ParameterPanelProps): JSX.Element | nu
             <select
               aria-label="Model"
               value={request.distortion.model}
-              onChange={(event) => setDistortionModel(event.target.value as "opencv" | "fisheye")}
+              onChange={(event) => setDistortionModel(event.target.value as DistortionModel["model"])}
             >
               {schema.distortion_models.map((model) => (
                 <option key={model} value={model}>
-                  {model}
+                  {DISTORTION_MODEL_LABELS[model as DistortionModel["model"]] ?? model}
                 </option>
               ))}
             </select>

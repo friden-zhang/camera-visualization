@@ -45,6 +45,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizeDistortionModel(value: unknown): "radtan" | "fisheye" | null {
+  if (value === "fisheye") {
+    return "fisheye";
+  }
+  if (value === "radtan" || value === "opencv") {
+    return "radtan";
+  }
+  return null;
+}
+
 function mergePose(defaultPose: Pose3D, rawPose: unknown): Pose3D {
   if (!isRecord(rawPose)) {
     return defaultPose;
@@ -277,9 +287,7 @@ export function resolvePersistedRequest(
     const distortion = rawRequest.distortion;
     candidate.distortion = {
       model:
-        distortion.model === "opencv" || distortion.model === "fisheye"
-          ? distortion.model
-          : defaults.distortion.model,
+        normalizeDistortionModel(distortion.model) ?? defaults.distortion.model,
       k1: typeof distortion.k1 === "number" ? distortion.k1 : defaults.distortion.k1,
       k2: typeof distortion.k2 === "number" ? distortion.k2 : defaults.distortion.k2,
       p1: typeof distortion.p1 === "number" ? distortion.p1 : defaults.distortion.p1,
@@ -307,14 +315,6 @@ export function resolvePersistedRequest(
         typeof displayOptions.show_bbox === "boolean"
           ? displayOptions.show_bbox
           : defaults.display_options.show_bbox,
-      show_distorted:
-        typeof displayOptions.show_distorted === "boolean"
-          ? displayOptions.show_distorted
-          : defaults.display_options.show_distorted,
-      show_undistorted:
-        typeof displayOptions.show_undistorted === "boolean"
-          ? displayOptions.show_undistorted
-          : defaults.display_options.show_undistorted,
       show_labels:
         typeof displayOptions.show_labels === "boolean"
           ? displayOptions.show_labels

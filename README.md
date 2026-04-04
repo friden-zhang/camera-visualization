@@ -10,11 +10,19 @@ Interactive camera projection validator with a Python/FastAPI math backend and a
 ## Features
 
 - Camera intrinsics, distortion, camera pose, and object pose editing
-- Object types: `box`, `rectangle`, `custom_points`
-- Views: ground top view, 3D scene, image projection, distortion compare
-- Numeric diagnostics: bbox, pixel span, coverage ratio, visibility, distortion offset
+- Object types: `sedan`, `truck`, `bicycle`, `pedestrian`, `traffic_cone`, `custom_points`
+- Views: 3D scene, image projection, and debug info
+- Numeric diagnostics: undistorted bbox, pixel span, coverage ratio, and visibility
 - Overlay image loading for the projection view
-- Hover and selection sync across views through shared point ids
+- Persistent local workspace state, including layout sizes and overlay image
+- Reset-to-defaults workflow for restoring schema defaults and layout
+
+## Distortion Models
+
+- `Standard (RadTan)`: standard radial+tangential distortion model for normal pinhole cameras
+- `Fisheye`: fisheye distortion model for ultra-wide or fisheye lenses
+
+The legacy internal name `opencv` is still accepted on input for compatibility, but the UI and API schema now use `radtan`.
 
 ## Project Layout
 

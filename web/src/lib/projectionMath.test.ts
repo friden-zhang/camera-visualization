@@ -13,7 +13,7 @@ const request: ProjectionRequest = {
     image_height: 720
   },
   distortion: {
-    model: "opencv",
+    model: "radtan",
     k1: 0,
     k2: 0,
     p1: 0,
@@ -52,8 +52,6 @@ const request: ProjectionRequest = {
   display_options: {
     show_frustum: true,
     show_bbox: true,
-    show_distorted: true,
-    show_undistorted: true,
     show_labels: true,
     show_axes: true
   }
@@ -116,11 +114,11 @@ const projection: ProjectionResult = {
     inside_image_undistorted: true
   },
   bbox: {
-    min_x: 585,
-    max_x: 695,
-    min_y: 282,
-    max_y: 378,
-    width: 110,
+    min_x: 586,
+    max_x: 694,
+    min_y: 281,
+    max_y: 377,
+    width: 108,
     height: 96,
     inside_image: true,
     intersects_image: true
@@ -137,7 +135,7 @@ const projection: ProjectionResult = {
   },
   principal_point: { x: 640, y: 360 },
   analysis: {
-    pixel_width: 110,
+    pixel_width: 108,
     pixel_height: 96,
     coverage_ratio: 0.012,
     distortion_mean_offset_px: 0.92,
