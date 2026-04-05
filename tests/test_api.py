@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import cv2
+import numpy as np
 from fastapi.testclient import TestClient
 
 from camviz.api.app import build_app
+from camviz.api.models import Pose3D
+from camviz.core.transforms import local_to_world, world_to_camera
 
 
 def build_payload() -> dict[str, object]:
@@ -117,6 +121,99 @@ def test_legacy_opencv_distortion_alias_is_still_accepted() -> None:
     response = client.post("/api/projection/evaluate", json=payload)
 
     assert response.status_code == 200
+
+
+def test_api_projection_matches_opencv_reference_points() -> None:
+    client = TestClient(build_app())
+    payload = build_payload()
+    payload["camera_intrinsics"] = {
+        "fx": 1567.356367755675,
+        "fy": 1567.306968974894,
+        "cx": 961.587845652537,
+        "cy": 542.296141020186,
+        "image_width": 1920,
+        "image_height": 1080,
+    }
+    payload["distortion"] = {
+        "model": "radtan",
+        "k1": -0.310387649487,
+        "k2": 0.076313217331,
+        "p1": -0.000111535757,
+        "p2": -0.000564977398,
+        "k3": 0.070410443420,
+        "k4": 0.0,
+        "k5": 0.0,
+        "k6": 0.0,
+    }
+    payload["camera_pose"] = {
+        "x": 0.0,
+        "y": -4.0,
+        "z": 1.7,
+        "yaw": 0.0,
+        "pitch": 5.0,
+        "roll": 0.0,
+    }
+    payload["object_spec"] = {
+        "type": "custom_points",
+        "pose": {"x": 0.0, "y": 14.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0, "roll": 0.0},
+        "points": [
+            {"id": "left_base", "x": -1.0, "y": 0.0, "z": 0.0},
+            {"id": "right_base", "x": 1.0, "y": 0.0, "z": 0.0},
+            {"id": "top", "x": 0.0, "y": 0.0, "z": 3.65},
+        ],
+        "edges": [
+            {"start_id": "left_base", "end_id": "right_base"},
+            {"start_id": "left_base", "end_id": "top"},
+            {"start_id": "right_base", "end_id": "top"},
+        ],
+    }
+
+    response = client.post("/api/projection/evaluate", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    camera_matrix = np.array(
+        [
+            [payload["camera_intrinsics"]["fx"], 0.0, payload["camera_intrinsics"]["cx"]],
+            [0.0, payload["camera_intrinsics"]["fy"], payload["camera_intrinsics"]["cy"]],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    distortion_vector = np.array(
+        [
+            payload["distortion"]["k1"],
+            payload["distortion"]["k2"],
+            payload["distortion"]["p1"],
+            payload["distortion"]["p2"],
+            payload["distortion"]["k3"],
+        ],
+        dtype=np.float64,
+    )
+    local_points = np.array(
+        [[point["x"], point["y"], point["z"]] for point in payload["object_spec"]["points"]],
+        dtype=np.float64,
+    )
+    world_points = local_to_world(local_points, Pose3D(**payload["object_spec"]["pose"]))
+    camera_points = world_to_camera(world_points, Pose3D(**payload["camera_pose"]))
+    cv_projected, _ = cv2.projectPoints(
+        camera_points.reshape(-1, 1, 3),
+        np.zeros((3, 1), dtype=np.float64),
+        np.zeros((3, 1), dtype=np.float64),
+        camera_matrix,
+        distortion_vector,
+    )
+    expected_by_id = {
+        point["id"]: cv_point.reshape(2)
+        for point, cv_point in zip(payload["object_spec"]["points"], cv_projected, strict=True)
+    }
+    actual_by_id = {point["point_id"]: point for point in body["projected_points"]}
+
+    for point_id, expected in expected_by_id.items():
+        actual = actual_by_id[point_id]["image"]
+        assert actual is not None
+        assert actual["x"] == expected[0]
+        assert actual["y"] == expected[1]
 
 
 def test_invalid_custom_point_topology_returns_validation_error() -> None:

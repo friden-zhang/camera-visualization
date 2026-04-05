@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 
+import cv2
+import numpy as np
 import pytest
 
 from camviz.api.models import (
@@ -16,7 +18,8 @@ from camviz.api.models import (
     TrafficConeSpec,
     TruckSpec,
 )
-from camviz.core.engine import evaluate_projection
+from camviz.core.engine import _project_image_point, evaluate_projection
+from camviz.core.transforms import local_to_world, world_to_camera
 
 
 def build_request(object_spec: object) -> ProjectionRequest:
@@ -196,3 +199,192 @@ def test_custom_points_still_work_as_debug_geometry() -> None:
     assert len(result.projected_points) == 3
     assert len(result.display_mesh.faces) == 0
     assert result.analysis.visible_point_count == 3
+
+
+def test_radtan_projection_matches_cv2_project_points() -> None:
+    intrinsics = CameraIntrinsics(
+        fx=1567.356367755675,
+        fy=1567.306968974894,
+        cx=961.587845652537,
+        cy=542.296141020186,
+        image_width=1920,
+        image_height=1080,
+    )
+    distortion = DistortionModel(
+        model="radtan",
+        k1=-0.310387649487,
+        k2=0.076313217331,
+        p1=-0.000111535757,
+        p2=-0.000564977398,
+        k3=0.070410443420,
+    )
+    camera_points = np.array(
+        [
+            [0.0, 0.0, 10.0],
+            [1.2, 0.3, 20.0],
+            [-2.5, 1.1, 35.0],
+            [4.0, -1.2, 55.0],
+        ],
+        dtype=np.float64,
+    )
+    camera_matrix = np.array(
+        [
+            [intrinsics.fx, 0.0, intrinsics.cx],
+            [0.0, intrinsics.fy, intrinsics.cy],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    distortion_vector = np.array(
+        [distortion.k1, distortion.k2, distortion.p1, distortion.p2, distortion.k3],
+        dtype=np.float64,
+    )
+
+    for camera_point in camera_points:
+        ours = _project_image_point(camera_point, intrinsics, distortion)
+        cv_projected, _ = cv2.projectPoints(
+            camera_point.reshape(1, 1, 3),
+            np.zeros((3, 1), dtype=np.float64),
+            np.zeros((3, 1), dtype=np.float64),
+            camera_matrix,
+            distortion_vector,
+        )
+        cv_point = cv_projected.reshape(2)
+
+        assert ours is not None
+        assert ours.x == pytest.approx(float(cv_point[0]), abs=1e-9)
+        assert ours.y == pytest.approx(float(cv_point[1]), abs=1e-9)
+
+
+def test_fisheye_projection_matches_cv2_fisheye_project_points() -> None:
+    intrinsics = CameraIntrinsics(
+        fx=1220.0,
+        fy=1212.0,
+        cx=960.0,
+        cy=540.0,
+        image_width=1920,
+        image_height=1080,
+    )
+    distortion = DistortionModel(
+        model="fisheye",
+        k1=-0.02,
+        k2=0.003,
+        k3=-0.0004,
+        k4=0.00003,
+    )
+    camera_points = np.array(
+        [
+            [0.0, 0.0, 8.0],
+            [0.6, 0.2, 7.0],
+            [-1.1, 0.5, 9.5],
+            [1.8, -0.7, 12.0],
+        ],
+        dtype=np.float64,
+    )
+    camera_matrix = np.array(
+        [
+            [intrinsics.fx, 0.0, intrinsics.cx],
+            [0.0, intrinsics.fy, intrinsics.cy],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    distortion_vector = np.array(
+        [distortion.k1, distortion.k2, distortion.k3, distortion.k4],
+        dtype=np.float64,
+    )
+
+    for camera_point in camera_points:
+        ours = _project_image_point(camera_point, intrinsics, distortion)
+        cv_projected, _ = cv2.fisheye.projectPoints(
+            camera_point.reshape(1, 1, 3),
+            np.zeros((3, 1), dtype=np.float64),
+            np.zeros((3, 1), dtype=np.float64),
+            camera_matrix,
+            distortion_vector,
+        )
+        cv_point = cv_projected.reshape(2)
+
+        assert ours is not None
+        assert ours.x == pytest.approx(float(cv_point[0]), abs=1e-9)
+        assert ours.y == pytest.approx(float(cv_point[1]), abs=1e-9)
+
+
+def test_full_projection_pipeline_stays_aligned_with_opencv_point_results() -> None:
+    request = ProjectionRequest(
+        camera_intrinsics=CameraIntrinsics(
+            fx=1567.356367755675,
+            fy=1567.306968974894,
+            cx=961.587845652537,
+            cy=542.296141020186,
+            image_width=1920,
+            image_height=1080,
+        ),
+        distortion=DistortionModel(
+            model="radtan",
+            k1=-0.310387649487,
+            k2=0.076313217331,
+            p1=-0.000111535757,
+            p2=-0.000564977398,
+            k3=0.070410443420,
+        ),
+        camera_pose=Pose3D(x=0.0, y=-4.0, z=1.7, yaw=0.0, pitch=5.0, roll=0.0),
+        object_spec=CustomPointSpec(
+            type="custom_points",
+            pose=Pose3D(x=0.0, y=14.0, z=0.0, yaw=0.0, pitch=0.0, roll=0.0),
+            points=[
+                {"id": "left_base", "x": -1.0, "y": 0.0, "z": 0.0},
+                {"id": "right_base", "x": 1.0, "y": 0.0, "z": 0.0},
+                {"id": "top", "x": 0.0, "y": 0.0, "z": 3.65},
+            ],
+            edges=[
+                {"start_id": "left_base", "end_id": "right_base"},
+                {"start_id": "left_base", "end_id": "top"},
+                {"start_id": "right_base", "end_id": "top"},
+            ],
+        ),
+    )
+    result = evaluate_projection(request)
+    camera_matrix = np.array(
+        [
+            [request.camera_intrinsics.fx, 0.0, request.camera_intrinsics.cx],
+            [0.0, request.camera_intrinsics.fy, request.camera_intrinsics.cy],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    distortion_vector = np.array(
+        [
+            request.distortion.k1,
+            request.distortion.k2,
+            request.distortion.p1,
+            request.distortion.p2,
+            request.distortion.k3,
+        ],
+        dtype=np.float64,
+    )
+
+    local_points = np.array(
+        [[point.x, point.y, point.z] for point in request.object_spec.points],
+        dtype=np.float64,
+    )
+    world_points = local_to_world(local_points, request.object_spec.pose)
+    camera_points = world_to_camera(world_points, request.camera_pose)
+    cv_projected, _ = cv2.projectPoints(
+        camera_points.reshape(-1, 1, 3),
+        np.zeros((3, 1), dtype=np.float64),
+        np.zeros((3, 1), dtype=np.float64),
+        camera_matrix,
+        distortion_vector,
+    )
+    expected_by_id = {
+        point.id: cv_point.reshape(2)
+        for point, cv_point in zip(request.object_spec.points, cv_projected, strict=True)
+    }
+
+    by_id = {point.point_id: point for point in result.projected_points}
+    for point_id, expected in expected_by_id.items():
+        diagnostic = by_id[point_id]
+        assert diagnostic.image is not None
+        assert diagnostic.image.x == pytest.approx(float(expected[0]), abs=1e-9)
+        assert diagnostic.image.y == pytest.approx(float(expected[1]), abs=1e-9)
