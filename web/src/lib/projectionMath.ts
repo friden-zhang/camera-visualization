@@ -10,8 +10,7 @@ import { cameraBasis, clampWorldToGround } from "./sceneMath";
 export interface ProjectedImagePoint {
   point_id: string;
   world: Vector3;
-  undistorted_image: Point2D | null;
-  distorted_image: Point2D | null;
+  image: Point2D | null;
   visible: boolean;
 }
 
@@ -34,8 +33,7 @@ function createImagePoint(pointId: string, imagePoint: Point2D): ProjectedImageP
   return {
     point_id: pointId,
     world: { x: 0, y: 0, z: 0 },
-    undistorted_image: imagePoint,
-    distorted_image: imagePoint,
+    image: imagePoint,
     visible: true
   };
 }
@@ -116,24 +114,18 @@ export function projectWorldPoint(
     return {
       point_id: "",
       world: point,
-      undistorted_image: null,
-      distorted_image: null,
+      image: null,
       visible: false
     };
   }
 
   const xNorm = cameraX / cameraZ;
   const yNorm = cameraY / cameraZ;
-  const undistortedImage = {
-    x: request.camera_intrinsics.fx * xNorm + request.camera_intrinsics.cx,
-    y: request.camera_intrinsics.fy * yNorm + request.camera_intrinsics.cy
-  };
   const [xDistorted, yDistorted] = distortNormalized(xNorm, yNorm, request.distortion);
   return {
     point_id: "",
     world: point,
-    undistorted_image: undistortedImage,
-    distorted_image: {
+    image: {
       x: request.camera_intrinsics.fx * xDistorted + request.camera_intrinsics.cx,
       y: request.camera_intrinsics.fy * yDistorted + request.camera_intrinsics.cy
     },
@@ -206,10 +198,10 @@ export function buildGroundProjectionSegments(
     return [];
   }
 
-  const topLeft = surface[0].distorted_image;
-  const topRight = surface[1].distorted_image;
-  const bottomRight = surface[2].distorted_image;
-  const bottomLeft = surface[3].distorted_image;
+  const topLeft = surface[0].image;
+  const topRight = surface[1].image;
+  const bottomRight = surface[2].image;
+  const bottomLeft = surface[3].image;
   if (!topLeft || !topRight || !bottomRight || !bottomLeft) {
     return [];
   }

@@ -117,8 +117,8 @@ def test_parameterized_objects_project_mesh_and_silhouette(
     assert len(result.display_mesh.vertices) > 0
     assert len(result.display_mesh.faces) > 0
     assert len(result.projected_points) > 0
-    assert result.silhouette.distorted
-    assert result.silhouette.undistorted
+    assert result.projected_points[0].image is not None
+    assert result.silhouette
     assert result.analysis.coverage_ratio > 0.0
     assert result.bbox.width > 0.0
     assert result.bbox.height > 0.0
@@ -170,7 +170,7 @@ def test_sedan_length_parameter_changes_mesh_extent_and_projection() -> None:
 
     assert long_length_span > short_length_span + 0.8
     assert long_result.bbox.height >= short_result.bbox.height
-    assert len(long_result.silhouette.distorted[0].points) >= 3
+    assert len(long_result.silhouette[0].points) >= 3
 
 
 def test_custom_points_still_work_as_debug_geometry() -> None:

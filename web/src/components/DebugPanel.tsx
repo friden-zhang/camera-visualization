@@ -26,7 +26,7 @@ export function DebugPanel({ projection }: DebugPanelProps): JSX.Element {
               <div><dt>Type</dt><dd>{projection.object_type}</dd></div>
               <div><dt>Mesh vertices</dt><dd>{projection.display_mesh.vertices.length}</dd></div>
               <div><dt>Mesh faces</dt><dd>{projection.display_mesh.faces.length}</dd></div>
-              <div><dt>Silhouette contours</dt><dd>{projection.silhouette.distorted.length}</dd></div>
+              <div><dt>Silhouette contours</dt><dd>{projection.silhouette.length}</dd></div>
             </dl>
           </div>
           <div>
@@ -36,7 +36,7 @@ export function DebugPanel({ projection }: DebugPanelProps): JSX.Element {
                 <div><dt>ID</dt><dd>{selectedPoint.point_id}</dd></div>
                 <div><dt>World</dt><dd>{selectedPoint.world.x.toFixed(2)}, {selectedPoint.world.y.toFixed(2)}, {selectedPoint.world.z.toFixed(2)}</dd></div>
                 <div><dt>Camera</dt><dd>{selectedPoint.camera.x.toFixed(2)}, {selectedPoint.camera.y.toFixed(2)}, {selectedPoint.camera.z.toFixed(2)}</dd></div>
-                <div><dt>Image</dt><dd>{selectedPoint.undistorted_image ? `${selectedPoint.undistorted_image.x.toFixed(2)}, ${selectedPoint.undistorted_image.y.toFixed(2)}` : selectedPoint.distorted_image ? `${selectedPoint.distorted_image.x.toFixed(2)}, ${selectedPoint.distorted_image.y.toFixed(2)}` : "n/a"}</dd></div>
+                <div><dt>Image</dt><dd>{selectedPoint.image ? `${selectedPoint.image.x.toFixed(2)}, ${selectedPoint.image.y.toFixed(2)}` : "n/a"}</dd></div>
               </dl>
             ) : (
               <p>No point selected.</p>

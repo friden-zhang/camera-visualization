@@ -203,11 +203,9 @@ class PointDiagnostic(BaseModel):
     point_id: str
     world: Vector3
     camera: Vector3
-    undistorted_image: Point2D | None
-    distorted_image: Point2D | None
+    image: Point2D | None
     visible: bool
     inside_image: bool
-    inside_image_undistorted: bool
 
 
 class BoundingBox(BaseModel):
@@ -225,8 +223,6 @@ class ProjectionAnalysis(BaseModel):
     pixel_width: float
     pixel_height: float
     coverage_ratio: float
-    distortion_mean_offset_px: float
-    distortion_max_offset_px: float
     visible_point_count: int
     hidden_point_count: int
     center_inside_image: bool
@@ -236,11 +232,6 @@ class ProjectionAnalysis(BaseModel):
 
 class Contour2D(BaseModel):
     points: list[Point2D]
-
-
-class SilhouetteSet(BaseModel):
-    distorted: list[Contour2D]
-    undistorted: list[Contour2D]
 
 
 class DisplayMesh(BaseModel):
@@ -255,11 +246,10 @@ class ProjectionResult(BaseModel):
     faces: list[Face]
     center: PointDiagnostic
     bbox: BoundingBox
-    undistorted_bbox: BoundingBox
     principal_point: Point2D
     analysis: ProjectionAnalysis
     display_mesh: DisplayMesh
-    silhouette: SilhouetteSet
+    silhouette: list[Contour2D]
 
 
 class ObjectParameterDefinition(BaseModel):

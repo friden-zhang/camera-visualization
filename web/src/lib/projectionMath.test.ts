@@ -64,41 +64,33 @@ const projection: ProjectionResult = {
       point_id: "front_left_wheel_center",
       world: { x: -0.72, y: 15.35, z: 0.33 },
       camera: { x: -0.72, y: 0.05, z: 19.4 },
-      undistorted_image: { x: 604, y: 362 },
-      distorted_image: { x: 603, y: 363 },
+      image: { x: 603, y: 363 },
       visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
+      inside_image: true
     },
     {
       point_id: "front_right_wheel_center",
       world: { x: 0.72, y: 15.35, z: 0.33 },
       camera: { x: 0.72, y: 0.05, z: 19.4 },
-      undistorted_image: { x: 676, y: 362 },
-      distorted_image: { x: 677, y: 363 },
+      image: { x: 677, y: 363 },
       visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
+      inside_image: true
     },
     {
       point_id: "rear_left_wheel_center",
       world: { x: -0.72, y: 12.65, z: 0.33 },
       camera: { x: -0.72, y: 0.02, z: 16.65 },
-      undistorted_image: { x: 598, y: 372 },
-      distorted_image: { x: 597, y: 373 },
+      image: { x: 597, y: 373 },
       visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
+      inside_image: true
     },
     {
       point_id: "rear_right_wheel_center",
       world: { x: 0.72, y: 12.65, z: 0.33 },
       camera: { x: 0.72, y: 0.02, z: 16.65 },
-      undistorted_image: { x: 682, y: 372 },
-      distorted_image: { x: 683, y: 373 },
+      image: { x: 683, y: 373 },
       visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
+      inside_image: true
     }
   ],
   edges: [],
@@ -107,23 +99,11 @@ const projection: ProjectionResult = {
     point_id: "object_center",
     world: { x: 0, y: 14, z: 0.75 },
     camera: { x: 0, y: -0.62, z: 18.01 },
-    undistorted_image: { x: 640, y: 325.83 },
-    distorted_image: { x: 640, y: 326.83 },
+    image: { x: 640, y: 326.83 },
     visible: true,
-    inside_image: true,
-    inside_image_undistorted: true
+    inside_image: true
   },
   bbox: {
-    min_x: 586,
-    max_x: 694,
-    min_y: 281,
-    max_y: 377,
-    width: 108,
-    height: 96,
-    inside_image: true,
-    intersects_image: true
-  },
-  undistorted_bbox: {
     min_x: 586,
     max_x: 694,
     min_y: 281,
@@ -138,8 +118,6 @@ const projection: ProjectionResult = {
     pixel_width: 108,
     pixel_height: 96,
     coverage_ratio: 0.012,
-    distortion_mean_offset_px: 0.92,
-    distortion_max_offset_px: 1.31,
     visible_point_count: 4,
     hidden_point_count: 0,
     center_inside_image: true,
@@ -158,30 +136,17 @@ const projection: ProjectionResult = {
       { vertex_indices: [0, 2, 3], label: "body" }
     ]
   },
-  silhouette: {
-    distorted: [
-      {
-        points: [
-          { x: 592, y: 376 },
-          { x: 587, y: 312 },
-          { x: 640, y: 282 },
-          { x: 693, y: 312 },
-          { x: 688, y: 376 }
-        ]
-      }
-    ],
-    undistorted: [
-      {
-        points: [
-          { x: 593, y: 375 },
-          { x: 588, y: 311 },
-          { x: 640, y: 281 },
-          { x: 692, y: 311 },
-          { x: 687, y: 375 }
-        ]
-      }
-    ]
-  }
+  silhouette: [
+    {
+      points: [
+        { x: 592, y: 376 },
+        { x: 587, y: 312 },
+        { x: 640, y: 282 },
+        { x: 693, y: 312 },
+        { x: 688, y: 376 }
+      ]
+    }
+  ]
 };
 
 describe("projectionMath ground surface", () => {
@@ -189,26 +154,26 @@ describe("projectionMath ground surface", () => {
     const surface = buildGroundProjectionSurface(request, projection);
 
     expect(surface).toHaveLength(4);
-    expect(surface.every((corner) => corner.distorted_image)).toBe(true);
+    expect(surface.every((corner) => corner.image)).toBe(true);
 
     const footprintProjection = projection.projected_points.map((point) =>
       projectWorldPoint({ ...point.world, z: 0 }, request)
     );
     const footprintBottom = Math.max(
-      ...footprintProjection.map((point) => point.distorted_image?.y ?? -Infinity)
+      ...footprintProjection.map((point) => point.image?.y ?? -Infinity)
     );
     const surfaceBottom = Math.max(
-      ...surface.map((corner) => corner.distorted_image?.y ?? -Infinity)
+      ...surface.map((corner) => corner.image?.y ?? -Infinity)
     );
     const objectMinX = Math.min(
-      ...footprintProjection.map((point) => point.distorted_image?.x ?? Infinity)
+      ...footprintProjection.map((point) => point.image?.x ?? Infinity)
     );
     const objectMaxX = Math.max(
-      ...footprintProjection.map((point) => point.distorted_image?.x ?? -Infinity)
+      ...footprintProjection.map((point) => point.image?.x ?? -Infinity)
     );
-    const surfaceMinX = Math.min(...surface.map((corner) => corner.distorted_image?.x ?? Infinity));
-    const surfaceMaxX = Math.max(...surface.map((corner) => corner.distorted_image?.x ?? -Infinity));
-    const surfaceMaxY = Math.max(...surface.map((corner) => corner.distorted_image?.y ?? -Infinity));
+    const surfaceMinX = Math.min(...surface.map((corner) => corner.image?.x ?? Infinity));
+    const surfaceMaxX = Math.max(...surface.map((corner) => corner.image?.x ?? -Infinity));
+    const surfaceMaxY = Math.max(...surface.map((corner) => corner.image?.y ?? -Infinity));
 
     expect(surfaceBottom).toBeGreaterThan(footprintBottom);
     expect(surfaceMinX).toBeLessThanOrEqual(1);

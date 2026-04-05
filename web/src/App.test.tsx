@@ -226,51 +226,41 @@ function makeEvaluationPayload(objectType = "sedan") {
         point_id: "front_bumper_center",
         world: { x: 0, y: 16.1, z: 0.72 },
         camera: { x: 0, y: -0.38, z: 20.2 },
-        undistorted_image: { x: 640, y: 339 },
-        distorted_image: { x: 640, y: 340 },
+        image: { x: 640, y: 340 },
         visible: true,
-        inside_image: true,
-        inside_image_undistorted: true
+        inside_image: true
       },
       {
         point_id: "rear_bumper_center",
         world: { x: 0, y: 11.9, z: 0.72 },
         camera: { x: 0, y: -0.15, z: 16.1 },
-        undistorted_image: { x: 640, y: 353 },
-        distorted_image: { x: 640, y: 354 },
+        image: { x: 640, y: 354 },
         visible: true,
-        inside_image: true,
-        inside_image_undistorted: true
+        inside_image: true
       },
       {
         point_id: "roof_center",
         world: { x: 0, y: 14, z: 1.35 },
         camera: { x: 0, y: -0.88, z: 18.05 },
-        undistorted_image: { x: 640, y: 313 },
-        distorted_image: { x: 640, y: 314 },
+        image: { x: 640, y: 314 },
         visible: true,
-        inside_image: true,
-        inside_image_undistorted: true
+        inside_image: true
       },
       {
         point_id: "front_left_wheel_center",
         world: { x: -0.72, y: 15.35, z: 0.33 },
         camera: { x: -0.72, y: 0.05, z: 19.4 },
-        undistorted_image: { x: 604, y: 362 },
-        distorted_image: { x: 603, y: 363 },
+        image: { x: 603, y: 363 },
         visible: true,
-        inside_image: true,
-        inside_image_undistorted: true
+        inside_image: true
       },
       {
         point_id: "front_right_wheel_center",
         world: { x: 0.72, y: 15.35, z: 0.33 },
         camera: { x: 0.72, y: 0.05, z: 19.4 },
-        undistorted_image: { x: 676, y: 362 },
-        distorted_image: { x: 677, y: 363 },
+        image: { x: 677, y: 363 },
         visible: true,
-        inside_image: true,
-        inside_image_undistorted: true
+        inside_image: true
       }
     ],
     edges: [],
@@ -279,23 +269,11 @@ function makeEvaluationPayload(objectType = "sedan") {
       point_id: "object_center",
       world: { x: 0, y: 14, z: 0.75 },
       camera: { x: 0, y: -0.62, z: 18.01 },
-      undistorted_image: { x: 640, y: 325.83 },
-      distorted_image: { x: 640, y: 326.83 },
+      image: { x: 640, y: 326.83 },
       visible: true,
-      inside_image: true,
-      inside_image_undistorted: true
+      inside_image: true
     },
     bbox: {
-      min_x: 586,
-      max_x: 694,
-      min_y: 281,
-      max_y: 377,
-      width: 108,
-      height: 96,
-      inside_image: true,
-      intersects_image: true
-    },
-    undistorted_bbox: {
       min_x: 586,
       max_x: 694,
       min_y: 281,
@@ -310,8 +288,6 @@ function makeEvaluationPayload(objectType = "sedan") {
       pixel_width: 108,
       pixel_height: 96,
       coverage_ratio: 0.012,
-      distortion_mean_offset_px: 0.92,
-      distortion_max_offset_px: 1.31,
       visible_point_count: 5,
       hidden_point_count: 0,
       center_inside_image: true,
@@ -338,30 +314,17 @@ function makeEvaluationPayload(objectType = "sedan") {
         { vertex_indices: [0, 5, 4], label: "side" }
       ]
     },
-    silhouette: {
-      distorted: [
-        {
-          points: [
-            { x: 592, y: 376 },
-            { x: 587, y: 312 },
-            { x: 640, y: 282 },
-            { x: 693, y: 312 },
-            { x: 688, y: 376 }
-          ]
-        }
-      ],
-      undistorted: [
-        {
-          points: [
-            { x: 593, y: 375 },
-            { x: 588, y: 311 },
-            { x: 640, y: 281 },
-            { x: 692, y: 311 },
-            { x: 687, y: 375 }
-          ]
-        }
-      ]
-    }
+    silhouette: [
+      {
+        points: [
+          { x: 592, y: 376 },
+          { x: 587, y: 312 },
+          { x: 640, y: 282 },
+          { x: 693, y: 312 },
+          { x: 688, y: 376 }
+        ]
+      }
+    ]
   };
 }
 
@@ -661,7 +624,8 @@ describe("App", () => {
     await screen.findByRole("heading", { name: /image projection view/i });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(document.querySelector(".ground-plane")).not.toBeNull());
-    await waitFor(() => expect(document.querySelector(".object-silhouette-undistorted")).not.toBeNull());
+    await waitFor(() => expect(document.querySelector(".object-silhouette")).not.toBeNull());
+    expect(document.querySelector(".object-silhouette-undistorted")).toBeNull();
     expect(document.querySelector(".object-silhouette-distorted")).toBeNull();
     expect(document.querySelector(".point-label")).toBeNull();
 

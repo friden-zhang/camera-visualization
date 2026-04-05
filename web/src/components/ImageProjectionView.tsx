@@ -18,13 +18,6 @@ const SILHOUETTE_CLASS_BY_TYPE: Record<string, string> = {
   custom_points: "object-silhouette-custom"
 };
 
-function imagePointForDisplay(point: {
-  distorted_image: Point2D | null;
-  undistorted_image: Point2D | null;
-}): Point2D | null {
-  return point.undistorted_image ?? point.distorted_image;
-}
-
 function contourPoints(contour: Contour2D): string | null {
   if (contour.points.length < 3) {
     return null;
@@ -80,7 +73,7 @@ export function ImageProjectionView({
     : SILHOUETTE_CLASS_BY_TYPE.custom_points;
   const groundPlanePoints = useMemo(() => {
     const points = groundProjectionSurface
-      .map((corner) => imagePointForDisplay(corner))
+      .map((corner) => corner.image)
       .filter((point): point is Point2D => point !== null);
     return points.length === 4 ? points.map((point) => `${point.x},${point.y}`).join(" ") : null;
   }, [groundProjectionSurface]);
@@ -90,15 +83,15 @@ export function ImageProjectionView({
     if (!farLeft || !farRight) {
       return null;
     }
-    const start = imagePointForDisplay(farLeft);
-    const end = imagePointForDisplay(farRight);
+    const start = farLeft.image;
+    const end = farRight.image;
     return start && end ? { start, end } : null;
   }, [groundProjectionSurface]);
-  const undistortedContours = projection?.silhouette.undistorted ?? [];
-  const centerPoint = projection ? imagePointForDisplay(projection.center) : null;
+  const contours = projection?.silhouette ?? [];
+  const centerPoint = projection?.center.image ?? null;
   const shouldRenderDebugEdges =
     projection?.object_type === "custom_points" ||
-    undistortedContours.length === 0;
+    contours.length === 0;
 
   return (
     <section className="view-card image-view-card">
@@ -177,25 +170,25 @@ export function ImageProjectionView({
           )}
           {groundProjectionSegments.map((segment) => (
             <g key={`ground-edge-${segment.start_id}-${segment.end_id}`}>
-              {segment.start.undistorted_image &&
-                segment.end.undistorted_image && (
+              {segment.start.image &&
+                segment.end.image && (
                   <line
-                    x1={segment.start.undistorted_image.x}
-                    y1={segment.start.undistorted_image.y}
-                    x2={segment.end.undistorted_image.x}
-                    y2={segment.end.undistorted_image.y}
-                    className="ground-edge-line ground-edge-line-undistorted"
+                    x1={segment.start.image.x}
+                    y1={segment.start.image.y}
+                    x2={segment.end.image.x}
+                    y2={segment.end.image.y}
+                    className="ground-edge-line"
                   />
                 )}
             </g>
           ))}
-          {undistortedContours.map((contour, index) => {
+          {contours.map((contour, index) => {
             const points = contourPoints(contour);
             return points ? (
               <polygon
-                key={`undistorted-silhouette-${index}`}
+                key={`silhouette-${index}`}
                 points={points}
-                className={`object-silhouette object-silhouette-undistorted ${silhouetteClass}`}
+                className={`object-silhouette ${silhouetteClass}`}
               />
             ) : null;
           })}
@@ -218,8 +211,8 @@ export function ImageProjectionView({
             projection?.edges.map((edge) => {
               const start = projection.projected_points.find((point) => point.point_id === edge.start_id);
               const end = projection.projected_points.find((point) => point.point_id === edge.end_id);
-              const startImage = start?.undistorted_image;
-              const endImage = end?.undistorted_image;
+              const startImage = start?.image;
+              const endImage = end?.image;
               if (!startImage || !endImage) {
                 return null;
               }
@@ -237,9 +230,9 @@ export function ImageProjectionView({
           {projection?.projected_points.map((point) => (
             <g key={point.point_id}>
               {renderPoint(
-                point.undistorted_image,
+                point.image,
                 point.point_id,
-                point.point_id === activeId ? "image-point point-active-undistorted" : "image-point point-undistorted",
+                point.point_id === activeId ? "image-point point-active" : "image-point point-default",
                 setHoveredPointId,
                 setSelectedPointId
               )}

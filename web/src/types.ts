@@ -139,11 +139,9 @@ const pointDiagnosticSchema = z.object({
   point_id: z.string(),
   world: vector3Schema,
   camera: vector3Schema,
-  undistorted_image: point2DSchema.nullable(),
-  distorted_image: point2DSchema.nullable(),
+  image: point2DSchema.nullable(),
   visible: z.boolean(),
-  inside_image: z.boolean(),
-  inside_image_undistorted: z.boolean()
+  inside_image: z.boolean()
 });
 
 const boundingBoxSchema = z.object({
@@ -161,8 +159,6 @@ const projectionAnalysisSchema = z.object({
   pixel_width: z.number(),
   pixel_height: z.number(),
   coverage_ratio: z.number(),
-  distortion_mean_offset_px: z.number(),
-  distortion_max_offset_px: z.number(),
   visible_point_count: z.number().int(),
   hidden_point_count: z.number().int(),
   center_inside_image: z.boolean(),
@@ -172,11 +168,6 @@ const projectionAnalysisSchema = z.object({
 
 const contour2DSchema = z.object({
   points: z.array(point2DSchema)
-});
-
-const silhouetteSetSchema = z.object({
-  distorted: z.array(contour2DSchema),
-  undistorted: z.array(contour2DSchema)
 });
 
 const displayMeshSchema = z.object({
@@ -215,11 +206,10 @@ export const projectionResultSchema = z.object({
   faces: z.array(faceSchema),
   center: pointDiagnosticSchema,
   bbox: boundingBoxSchema,
-  undistorted_bbox: boundingBoxSchema,
   principal_point: point2DSchema,
   analysis: projectionAnalysisSchema,
   display_mesh: displayMeshSchema,
-  silhouette: silhouetteSetSchema
+  silhouette: z.array(contour2DSchema)
 });
 
 export const projectionSchemaSchema = z.object({
@@ -254,7 +244,6 @@ export type PointDiagnostic = z.infer<typeof pointDiagnosticSchema>;
 export type BoundingBox = z.infer<typeof boundingBoxSchema>;
 export type ProjectionAnalysis = z.infer<typeof projectionAnalysisSchema>;
 export type Contour2D = z.infer<typeof contour2DSchema>;
-export type SilhouetteSet = z.infer<typeof silhouetteSetSchema>;
 export type DisplayMesh = z.infer<typeof displayMeshSchema>;
 export type ObjectParameterDefinition = z.infer<typeof objectParameterDefinitionSchema>;
 export type ObjectTypeDefinition = z.infer<typeof objectTypeDefinitionSchema>;

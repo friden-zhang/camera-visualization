@@ -93,14 +93,19 @@ def test_evaluate_projection_returns_landmarks_mesh_silhouette_and_analysis() ->
     payload = response.json()
     assert payload["object_type"] == "sedan"
     assert len(payload["projected_points"]) > 0
+    assert "image" in payload["projected_points"][0]
+    assert "distorted_image" not in payload["projected_points"][0]
+    assert "undistorted_image" not in payload["projected_points"][0]
     assert len(payload["display_mesh"]["vertices"]) > 0
     assert len(payload["display_mesh"]["faces"]) > 0
-    assert len(payload["silhouette"]["distorted"]) > 0
+    assert len(payload["silhouette"]) > 0
     assert payload["bbox"]["width"] > 0.0
     assert payload["analysis"]["coverage_ratio"] > 0.0
-    assert payload["bbox"] == payload["undistorted_bbox"]
-    assert payload["analysis"]["pixel_width"] == payload["undistorted_bbox"]["width"]
-    assert payload["analysis"]["pixel_height"] == payload["undistorted_bbox"]["height"]
+    assert "undistorted_bbox" not in payload
+    assert "distortion_mean_offset_px" not in payload["analysis"]
+    assert "distortion_max_offset_px" not in payload["analysis"]
+    assert payload["analysis"]["pixel_width"] == payload["bbox"]["width"]
+    assert payload["analysis"]["pixel_height"] == payload["bbox"]["height"]
     assert payload["center"]["point_id"] == "object_center"
 
 

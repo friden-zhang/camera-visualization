@@ -15,7 +15,6 @@ from camviz.api.models import (
     ProjectionAnalysis,
     ProjectionRequest,
     ProjectionResult,
-    SilhouetteSet,
     Vector3,
 )
 from camviz.core.object_geometry import generate_object_geometry
@@ -68,23 +67,18 @@ def _distort_normalized(
 
 def _project_image_point(
     point_camera: np.ndarray, intrinsics: CameraIntrinsics, distortion: DistortionModel
-) -> tuple[Point2D | None, Point2D | None]:
+) -> Point2D | None:
     z_value = float(point_camera[2])
     if z_value <= 1e-9:
-        return None, None
+        return None
 
     x_norm = float(point_camera[0] / z_value)
     y_norm = float(point_camera[1] / z_value)
-    undistorted = Point2D(
-        x=intrinsics.fx * x_norm + intrinsics.cx,
-        y=intrinsics.fy * y_norm + intrinsics.cy,
-    )
     x_distorted, y_distorted = _distort_normalized(x_norm, y_norm, distortion)
-    distorted = Point2D(
+    return Point2D(
         x=intrinsics.fx * x_distorted + intrinsics.cx,
         y=intrinsics.fy * y_distorted + intrinsics.cy,
     )
-    return undistorted, distorted
 
 
 def _inside_image(point: Point2D | None, intrinsics: CameraIntrinsics) -> bool:
@@ -140,33 +134,29 @@ def _diagnostic_from_vectors(
     intrinsics: CameraIntrinsics,
     distortion: DistortionModel,
 ) -> PointDiagnostic:
-    undistorted_image, distorted_image = _project_image_point(camera, intrinsics, distortion)
+    image = _project_image_point(camera, intrinsics, distortion)
     return PointDiagnostic(
         point_id=point_id,
         world=Vector3(x=float(world[0]), y=float(world[1]), z=float(world[2])),
         camera=Vector3(x=float(camera[0]), y=float(camera[1]), z=float(camera[2])),
-        undistorted_image=undistorted_image,
-        distorted_image=distorted_image,
+        image=image,
         visible=camera[2] > 1e-9,
-        inside_image=_inside_image(distorted_image, intrinsics),
-        inside_image_undistorted=_inside_image(undistorted_image, intrinsics),
+        inside_image=_inside_image(image, intrinsics),
     )
 
 
 def _project_vertices(
     camera_vertices: np.ndarray, intrinsics: CameraIntrinsics, distortion: DistortionModel
-) -> tuple[list[Point2D | None], list[Point2D | None]]:
-    undistorted: list[Point2D | None] = []
-    distorted: list[Point2D | None] = []
+) -> list[Point2D | None]:
+    projected: list[Point2D | None] = []
     for vertex_camera in camera_vertices:
-        vertex_undistorted, vertex_distorted = _project_image_point(
+        vertex_image = _project_image_point(
             vertex_camera,
             intrinsics,
             distortion,
         )
-        undistorted.append(vertex_undistorted)
-        distorted.append(vertex_distorted)
-    return undistorted, distorted
+        projected.append(vertex_image)
+    return projected
 
 
 def _mesh_to_display(vertices_world: np.ndarray, mesh_faces: list[MeshFace]) -> DisplayMesh:
@@ -237,64 +227,42 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         distortion=request.distortion,
     )
 
-    undistorted_vertex_points, distorted_vertex_points = _project_vertices(
+    vertex_points = _project_vertices(
         camera_vertices,
         request.camera_intrinsics,
         request.distortion,
     )
 
     if geometry.mesh_faces:
-        undistorted_mask = rasterize_visible_mask(
-            undistorted_vertex_points,
+        mask = rasterize_visible_mask(
+            vertex_points,
             camera_vertices[:, 2],
             geometry.mesh_faces,
             image_width=request.camera_intrinsics.image_width,
             image_height=request.camera_intrinsics.image_height,
         )
-        distorted_mask = rasterize_visible_mask(
-            distorted_vertex_points,
-            camera_vertices[:, 2],
-            geometry.mesh_faces,
-            image_width=request.camera_intrinsics.image_width,
-            image_height=request.camera_intrinsics.image_height,
-        )
-        undistorted_bbox = bbox_from_mask(undistorted_mask)
-        silhouette = SilhouetteSet(
-            distorted=contours_from_mask(distorted_mask),
-            undistorted=contours_from_mask(undistorted_mask),
-        )
-        coverage = coverage_ratio(undistorted_mask)
+        bbox = bbox_from_mask(mask)
+        silhouette = contours_from_mask(mask)
+        coverage = coverage_ratio(mask)
     else:
-        undistorted_bbox = _build_bbox(
-            [point.undistorted_image for point in projected_points], request.camera_intrinsics
-        )
-        silhouette = SilhouetteSet(distorted=[], undistorted=[])
+        bbox = _build_bbox([point.image for point in projected_points], request.camera_intrinsics)
+        silhouette = []
         coverage = (
-            undistorted_bbox.width * undistorted_bbox.height
+            bbox.width * bbox.height
             / float(request.camera_intrinsics.image_width * request.camera_intrinsics.image_height)
-            if undistorted_bbox.width > 0.0 and undistorted_bbox.height > 0.0
+            if bbox.width > 0.0 and bbox.height > 0.0
             else 0.0
         )
 
-    distortion_offsets = [
-        math.hypot(
-            point.distorted_image.x - point.undistorted_image.x,
-            point.distorted_image.y - point.undistorted_image.y,
-        )
-        for point in projected_points
-        if point.distorted_image is not None and point.undistorted_image is not None
-    ]
     analysis = ProjectionAnalysis(
-        pixel_width=undistorted_bbox.width,
-        pixel_height=undistorted_bbox.height,
+        pixel_width=bbox.width,
+        pixel_height=bbox.height,
         coverage_ratio=coverage,
-        distortion_mean_offset_px=float(np.mean(distortion_offsets)) if distortion_offsets else 0.0,
-        distortion_max_offset_px=float(np.max(distortion_offsets)) if distortion_offsets else 0.0,
         visible_point_count=sum(point.visible for point in projected_points),
         hidden_point_count=sum(not point.visible for point in projected_points),
-        center_inside_image=center_point.inside_image_undistorted,
-        bbox_intersects_image=undistorted_bbox.intersects_image,
-        bbox_inside_image=undistorted_bbox.inside_image,
+        center_inside_image=center_point.inside_image,
+        bbox_intersects_image=bbox.intersects_image,
+        bbox_inside_image=bbox.inside_image,
     )
     return ProjectionResult(
         object_type=request.object_spec.type,
@@ -302,8 +270,7 @@ def evaluate_projection(request: ProjectionRequest) -> ProjectionResult:
         edges=geometry.debug_edges,
         faces=geometry.debug_faces,
         center=center_point,
-        bbox=undistorted_bbox,
-        undistorted_bbox=undistorted_bbox,
+        bbox=bbox,
         principal_point=Point2D(x=request.camera_intrinsics.cx, y=request.camera_intrinsics.cy),
         analysis=analysis,
         display_mesh=_mesh_to_display(world_vertices, geometry.mesh_faces),
