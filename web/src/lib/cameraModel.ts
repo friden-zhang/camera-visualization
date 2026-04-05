@@ -4,7 +4,7 @@ import { type Pose3D } from "../types";
 import { cameraBasis, type SceneVector } from "./sceneMath";
 
 function worldDirectionToScene([x, y, z]: [number, number, number]): SceneVector {
-  return [x, z, y];
+  return [x, z, -y];
 }
 
 export function cameraModelAxes(pose: Pose3D): {

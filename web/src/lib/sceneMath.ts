@@ -69,7 +69,7 @@ export function cameraBasis(pose: Pose3D): {
 }
 
 export function worldToScene({ x, y, z }: Vector3): SceneVector {
-  return [x, z, y];
+  return [x, z, -y];
 }
 
 export function clampWorldToGround(point: Vector3): Vector3 {
@@ -103,7 +103,41 @@ export function clipWorldSegmentToGround(start: Vector3, end: Vector3): [Vector3
 }
 
 export function worldArrayToScene([x, y, z]: SceneVector): SceneVector {
-  return [x, z, y];
+  return [x, z, -y];
+}
+
+export function alignedOrbitViewWorld(
+  cameraWorld: Pose3D,
+  objectWorld: Vector3,
+  objectSpan: number,
+  maxObjectHeight: number
+): {
+  orbitWorld: Vector3;
+  targetWorld: Vector3;
+} {
+  const { forward } = cameraBasis(cameraWorld);
+  const planarForward = normalize([forward[0], forward[1], 0]);
+  const cameraToObjectDistance = Math.hypot(
+    objectWorld.x - cameraWorld.x,
+    objectWorld.y - cameraWorld.y,
+    objectWorld.z - cameraWorld.z
+  );
+  const backDistance = Math.max(18, Math.min(cameraToObjectDistance * 0.18, 52), objectSpan * 2.8);
+  const lift = Math.max(5, maxObjectHeight * 1.8, objectSpan * 1.05);
+
+  const orbitWorld: Vector3 = {
+    x: cameraWorld.x - planarForward[0] * backDistance,
+    y: cameraWorld.y - planarForward[1] * backDistance,
+    z: Math.max(cameraWorld.z + lift, 3.5)
+  };
+  const opticalDepth = Math.max(30, Math.min(cameraToObjectDistance * 0.75, 180));
+  const targetWorld: Vector3 = {
+    x: cameraWorld.x + forward[0] * opticalDepth,
+    y: cameraWorld.y + forward[1] * opticalDepth,
+    z: cameraWorld.z + forward[2] * opticalDepth
+  };
+
+  return { orbitWorld, targetWorld };
 }
 
 export function sceneFrame(
@@ -148,22 +182,26 @@ export function sceneFrame(
   const objectSpan = Math.max(maxX - minX, maxY - minY, maxObjectHeight, 2);
   const objectCenterX = (minX + maxX) / 2;
   const objectCenterY = (minY + maxY) / 2;
-  const target: SceneVector = [
-    objectCenterX,
-    Math.max(objectScene[1] + maxObjectHeight * 0.16, maxObjectHeight * 0.52, 0.72),
-    objectCenterY
-  ];
-  const lookDistance = Math.max(16, cameraToObjectDistance * 0.92, objectSpan * 5.6);
-  const orbitOffset = scale(normalize([0.68, 0.52, -0.92]), lookDistance);
-  const orbitPosition = add(target, orbitOffset);
+  const { orbitWorld, targetWorld } = alignedOrbitViewWorld(
+    request.camera_pose,
+    {
+      x: objectCenterX,
+      y: objectCenterY,
+      z: Math.max(objectWorld.z, maxObjectHeight * 0.5)
+    },
+    objectSpan,
+    maxObjectHeight
+  );
+  const target: SceneVector = worldToScene(targetWorld);
+  const orbitPosition = worldToScene(orbitWorld);
 
   const worldXs = [cameraWorld.x, objectWorld.x, ...worldPoints.map((point) => point.x)];
   const worldYs = [cameraWorld.y, objectWorld.y, ...worldPoints.map((point) => point.y)];
-  const groundCenter: SceneVector = [
-    (Math.max(...worldXs) + Math.min(...worldXs)) / 2,
-    0,
-    (Math.max(...worldYs) + Math.min(...worldYs)) / 2
-  ];
+  const groundCenter = worldToScene({
+    x: (Math.max(...worldXs) + Math.min(...worldXs)) / 2,
+    y: (Math.max(...worldYs) + Math.min(...worldYs)) / 2,
+    z: 0
+  });
   const groundSize = Math.max(
     26,
     (Math.max(...worldXs) - Math.min(...worldXs) + Math.max(...worldYs) - Math.min(...worldYs)) * 2.4
